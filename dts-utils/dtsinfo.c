@@ -10,6 +10,9 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+/* TODO Find portable macro*/
+#define LINE_MAX 1024
+
 #define SYSFS_CLASS_PATH "/sys/class/"
 #define SYSFS_DEVICE_PATH "/sys/devices/"
 #define SYSFS_DEVICETREE_PATH "/sys/firmware/devicetree/base"
@@ -29,7 +32,7 @@ void usage()
 void print_classes()
 {
 	DIR *dir;
-	struct dirent *dirp;
+	struct dirent *ent;
 
 	printf("classes:\n");
 
@@ -39,45 +42,83 @@ void print_classes()
 		return;
 	}
 
-	while ((dirp = readdir(dir)) != NULL) {
-		if ((strcmp(dirp->d_name, ".")) && strcmp((dirp->d_name), ".."))
-			printf("%s\n", dirp->d_name);
+	while ((ent = readdir(dir)) != NULL) {
+		if ((strcmp(ent->d_name, ".")) && strcmp((ent->d_name), ".."))
+			printf("%s\n", ent->d_name);
 	}
 
 	closedir(dir);
 }
 
+void print_content(char *dirname, struct dirent *entry)
+{
+	FILE *stream;
+	char pathname[PATH_MAX];
+	char content[LINE_MAX];
+
+	printf("%s:\n", entry->d_name);
+
+	if (entry->d_type != DT_REG) {
+		printf("error: file is not a regular file\n");
+		return;
+	}
+
+	sprintf(pathname, "%s/%s", dirname, entry->d_name);
+	stream = fopen(pathname, "r");
+	if (!stream) {
+		printf("error: %s\n", strerror(errno));
+		return;
+	}
+
+	if(!fgets(content, LINE_MAX, stream)){
+		printf("Infomration not available\n");
+	}
+
+	if (fputs(content, stdout) == EOF) {
+		printf("error writing to standard out\n");
+	}
+
+	printf("\n\n");
+}
+
 void print_devicetree()
 {
 	DIR *dir;
-	struct dirent *dirp;
-	int i = 0;
-	char *buf[FILENAME_MAX];
+	struct dirent *ent;
+	struct dirent *entry[20];
+	struct dirent *(*direntp)[];
+	int i = 0, count;
+	char *dirname = SYSFS_DEVICETREE_PATH;
 
-	printf("Device Tree:\n\n");
-
-	dir = opendir(SYSFS_DEVICETREE_PATH);
+	dir = opendir(dirname);
 	if (!dir) {
 		printf("error: %s\n", strerror(errno));
 		return;
 	}
 
-	while ((dirp = readdir(dir)) != NULL) {
-		if ((strcmp(dirp->d_name, ".")) && (strcmp((dirp->d_name), ".."))) {
-			buf[i] = malloc(FILENAME_MAX * sizeof(char *));
-			sprintf(buf[i], "%s", dirp->d_name);
-			printf("%s\n", buf[i]);
-			i++;
+	for (i = 0; i < 20; i++) {
+		entry[i] = malloc(sizeof(struct dirent *));
+	}
+	direntp = &entry;
+
+	i = 0;
+	while (((ent = readdir(dir)) != NULL) && (i < 20)) {
+		if ((strcmp(ent->d_name, ".")) && (strcmp((ent->d_name), ".."))) {
+			(*direntp)[i] = ent;
 		}
+		i++;
 	}
 
-	int count = i;
-	for (i = 0; i < count; i++) {
-		if (!(strcmp(buf[i], "model"))) {
-//			printf("Found it");
-				break;
-		}
-	}
+	count = i;
+	i = 0;
+	while ((strcmp((*direntp)[i]->d_name, "model")) && i < count) 
+		i++;
+	print_content(dirname, (*direntp)[i]);
+
+	i = 0;
+	while ((strcmp((*direntp)[i]->d_name, "compatible")) && i < count) 
+		i++;
+	print_content(dirname, (*direntp)[i]);
 
 	closedir(dir);
 }
@@ -87,6 +128,7 @@ int main(int argc, char **argv)
     int opt;
 	int flags = 0;
 
+	printf("\nDTS and firmware Infomration:\n\n");
     while ((opt = getopt(argc, argv, "ch")) != -1) {
         switch (opt) {
 		case 'c':
@@ -113,5 +155,6 @@ int main(int argc, char **argv)
 	if (!flags)
 		print_devicetree();
 
+	printf("\n");
 	return 0;
 }
