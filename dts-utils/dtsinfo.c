@@ -10,6 +10,14 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+#define VERSION 0
+#define REVISION 1
+#define TOOL_NAME "dtsinfo"
+
+#define OPT_HELP 1
+#define OPT_VERSION 2
+#define OPT_CLASSES 3
+
 /* TODO Find portable macro*/
 #define LINE_MAX 1024
 
@@ -17,16 +25,19 @@
 #define SYSFS_DEVICE_PATH "/sys/devices/"
 #define SYSFS_DEVICETREE_PATH "/sys/firmware/devicetree/base"
 
-#define OPT_HELP 1
-#define OPT_CLASSES 2
-
 void usage()
 {
 	printf("dtsinfo:\n");
 	printf("Usage: "
-            "./dtsinfo [-h -c]\n"
-            "-h - Usage\n"
-            "-c - Print classes\n"); 
+            "./dtsinfo [-c -h -v]\n"
+            "-c - Print classes\n"
+			"-h - Usage\n"
+			"-v - Version\n"); 
+}
+
+void print_version()
+{
+	printf("%s version:%d.%d",TOOL_NAME, VERSION, REVISION);
 }
 
 void print_classes()
@@ -129,7 +140,7 @@ int main(int argc, char **argv)
 	int flags = 0;
 
 	printf("\nDTS and firmware Infomration:\n\n");
-    while ((opt = getopt(argc, argv, "ch")) != -1) {
+    while ((opt = getopt(argc, argv, "chv")) != -1) {
         switch (opt) {
 		case 'c':
 			flags |= OPT_CLASSES;
@@ -139,6 +150,9 @@ int main(int argc, char **argv)
 			flags |= OPT_HELP;
 			break;
 
+		case 'v':
+			flags |= OPT_VERSION;
+
 		/*
 			TODO 
 			add gpio check flags
@@ -146,11 +160,14 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (flags & OPT_CLASSES)
+		print_classes();
+
 	if (flags & OPT_HELP)
 		usage();
 
-	if (flags & OPT_CLASSES)
-		print_classes();
+	if (flags & OPT_VERSION)
+		print_version();
 
 	if (!flags)
 		print_devicetree();
