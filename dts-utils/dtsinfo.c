@@ -3,12 +3,8 @@
 /* dtsinfo - show information about device tree and associated firmware in the system */
 
 /* */
-#include <stdio.h>
-#include <dirent.h>
-#include <errno.h>
-#include <string.h>
-#include <unistd.h>
-#include <stdlib.h>
+
+#include "utilbox.h"
 
 #define VERSION 0
 #define REVISION 1
@@ -134,7 +130,7 @@ void print_devicetree()
 	closedir(dir);
 }
 
-int main(int argc, char **argv)
+int dtsinfo_main(int argc, char **argv)
 {
     int opt;
 	int flags = 0;
