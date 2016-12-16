@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#define UTILITY_COUNT 10
+#define UTILITY_COUNT 1
 
 struct utility {
 	char * util_name;
@@ -21,10 +21,6 @@ struct utility {
 	int version;
 	int revision;
 	int (*util_main)(int, char **);
-};
-
-struct util_list {
-	struct utility *utils[UTILITY_COUNT];
 };
 
 int dtsinfo_main(int argc, char **argv);

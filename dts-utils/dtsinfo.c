@@ -127,6 +127,9 @@ void print_devicetree()
 		i++;
 	print_content(dirname, (*direntp)[i]);
 
+	// print cpus
+	// print psci
+
 	closedir(dir);
 }
 
@@ -148,7 +151,7 @@ int dtsinfo_main(int argc, char **argv)
 
 		case 'v':
 			flags |= OPT_VERSION;
-
+			break;
 		/*
 			TODO 
 			add gpio check flags
