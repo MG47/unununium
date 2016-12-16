@@ -15,6 +15,12 @@ struct utility util_list[UTILITY_COUNT] = {
 		.revision = DTSINFO_REVISION,
 		.util_main = &dtsinfo_main,
 	},
+	{
+		.util_name = "tiper",
+		.version = TIPER_VERSION,
+		.revision = TIPER_REVISION,
+		.util_main = &tiper_main,
+	},
 };
 
 int main(int argc, char **argv)
@@ -24,7 +30,7 @@ int main(int argc, char **argv)
 
 	int i;
 	for (i = 0; i < UTILITY_COUNT; i++) {
-		if (!strcmp(util_list->util_name, argv[0])) {
+		if (!strcmp(util_list[i].util_name, argv[0])) {
 			util_list[i].util_main(argc, argv);
 			break;
 		}

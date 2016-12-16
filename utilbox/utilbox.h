@@ -13,10 +13,10 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#define UTILITY_COUNT 1
+#define UTILITY_COUNT 2
 
 struct utility {
-	char * util_name;
+	char *util_name;
 	int argc;
 	int version;
 	int revision;
@@ -29,5 +29,10 @@ struct utility {
 int dtsinfo_main(int argc, char **argv);
 #define DTSINFO_VERSION 0
 #define DTSINFO_REVISION 1
+
+/* tiper */
+int tiper_main(int argc, char **argv);
+#define TIPER_VERSION 0
+#define TIPER_REVISION 1
 
 #endif

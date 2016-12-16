@@ -19,22 +19,23 @@
 #define SYSFS_DEVICE_PATH "/sys/devices/"
 #define SYSFS_DEVICETREE_PATH "/sys/firmware/devicetree/base"
 
-void usage()
+static void usage()
 {
 	printf("dtsinfo");
 	printf("Usage: "
-            "./dtsinfo [-c -h -v]\n"
+            "./dtsinfo [OPTIONS]\n"
+            "OPTIONS:\n"
             "-c - Print classes\n"
 			"-h - Usage\n"
 			"-v - Version\n"); 
 }
 
-void print_version()
+static void print_version()
 {
 	printf("%s version: %d.%d",TOOL_NAME, DTSINFO_VERSION, DTSINFO_REVISION);
 }
 
-void print_classes()
+static void print_classes()
 {
 	DIR *dir;
 	struct dirent *ent;
@@ -55,7 +56,7 @@ void print_classes()
 	closedir(dir);
 }
 
-void print_content(char *dirname, struct dirent *entry)
+static void print_content(char *dirname, struct dirent *entry)
 {
 	FILE *stream;
 	char pathname[PATH_MAX];
@@ -86,7 +87,7 @@ void print_content(char *dirname, struct dirent *entry)
 	printf("\n\n");
 }
 
-void print_devicetree()
+static void print_devicetree()
 {
 	DIR *dir;
 	struct dirent *ent;
@@ -139,18 +140,18 @@ int dtsinfo_main(int argc, char **argv)
     if(argc > 1) {
 	    while ((opt = getopt(argc, argv, "hvc")) != -1) {
 	        switch (opt) {
-	            case 'h':
-	            	flags |= OPT_HELP;
-	                break;
-	            case 'v':
-	            	flags = OPT_VERSION;
-	                break;
-	            case 'c':
-	                flags |= OPT_CLASSES;
-	                break;
-	            default:
-	            	flags |= OPT_HELP;
-	            	break;
+            case 'h':
+            	flags |= OPT_HELP;
+                break;
+            case 'v':
+            	flags = OPT_VERSION;
+                break;
+            case 'c':
+                flags |= OPT_CLASSES;
+                break;
+            default:
+            	flags |= OPT_HELP;
+            	break;
 	        }
 	    }
 
