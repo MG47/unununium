@@ -6,8 +6,6 @@
 
 #include "utilbox.h"
 
-#define VERSION 0
-#define REVISION 1
 #define TOOL_NAME "dtsinfo"
 
 #define OPT_HELP 1
@@ -23,7 +21,7 @@
 
 void usage()
 {
-	printf("dtsinfo:\n");
+	printf("dtsinfo");
 	printf("Usage: "
             "./dtsinfo [-c -h -v]\n"
             "-c - Print classes\n"
@@ -33,7 +31,7 @@ void usage()
 
 void print_version()
 {
-	printf("%s version:%d.%d",TOOL_NAME, VERSION, REVISION);
+	printf("%s version: %d.%d",TOOL_NAME, DTSINFO_VERSION, DTSINFO_REVISION);
 }
 
 void print_classes()
@@ -137,31 +135,37 @@ int dtsinfo_main(int argc, char **argv)
 {
 	int flags = 0;
     int opt;
-    while ((opt = getopt(argc, argv, "hvc")) != -1) {
-        switch (opt) {
-            case 'h':
-            	flags |= OPT_HELP;
-                break;
-            case 'v':
-            	flags = OPT_VERSION;
-                break;
-            case 'c':
-                flags |= OPT_CLASSES;
-                break;
-        }
-    }
 
-	if (flags & OPT_HELP)
-		usage();
+    if(argc > 1) {
+	    while ((opt = getopt(argc, argv, "hvc")) != -1) {
+	        switch (opt) {
+	            case 'h':
+	            	flags |= OPT_HELP;
+	                break;
+	            case 'v':
+	            	flags = OPT_VERSION;
+	                break;
+	            case 'c':
+	                flags |= OPT_CLASSES;
+	                break;
+	            default:
+	            	flags |= OPT_HELP;
+	            	break;
+	        }
+	    }
 
-	if (flags & OPT_VERSION)
-		print_version();
+		if (flags & OPT_HELP)
+			usage();
 
-	if (flags & OPT_CLASSES)
-		print_classes();
+		if (flags & OPT_VERSION)
+			print_version();
 
-	if (!flags)
+		if (flags & OPT_CLASSES)
+			print_classes();
+
+	} else {
 		print_devicetree();
+	}
 
 	printf("\n");
 	return 0;

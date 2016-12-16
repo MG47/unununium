@@ -23,7 +23,11 @@ struct utility {
 	int (*util_main)(int, char **);
 };
 
+/* Utility-specific macros and function declarations */
+
+/* dtsinfo */
 int dtsinfo_main(int argc, char **argv);
-void print_classes();
+#define DTSINFO_VERSION 0
+#define DTSINFO_REVISION 1
 
 #endif

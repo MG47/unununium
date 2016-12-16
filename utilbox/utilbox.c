@@ -11,15 +11,15 @@
 struct utility util_list[UTILITY_COUNT] = {
 	{
 		.util_name = "dtsinfo",
-		.version = 0,
-		.revision = 1,
+		.version = DTSINFO_VERSION,
+		.revision = DTSINFO_REVISION,
 		.util_main = &dtsinfo_main,
-	}
+	},
 };
 
 int main(int argc, char **argv)
 {
-	printf("Welcome to utilbox (%d.%d)", UTILBOX_VERSION, UTILBOX_REVISION); 
+	printf("Welcome to utilbox (%d.%d)\n", UTILBOX_VERSION, UTILBOX_REVISION); 
 	printf("executing utility %s\n", argv[0]);
 
 	int i;
