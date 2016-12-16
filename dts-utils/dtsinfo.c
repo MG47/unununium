@@ -11,8 +11,8 @@
 #define TOOL_NAME "dtsinfo"
 
 #define OPT_HELP 1
-#define OPT_VERSION 2
-#define OPT_CLASSES 3
+#define OPT_VERSION (1 << 1)
+#define OPT_CLASSES (1 << 2)
 
 /* TODO Find portable macro*/
 #define LINE_MAX 1024
@@ -135,32 +135,21 @@ void print_devicetree()
 
 int dtsinfo_main(int argc, char **argv)
 {
-    int opt;
 	int flags = 0;
-
-	printf("\nDTS and firmware Infomration:\n\n");
-    while ((opt = getopt(argc, argv, "chv")) != -1) {
+    int opt;
+    while ((opt = getopt(argc, argv, "hvc")) != -1) {
         switch (opt) {
-		case 'c':
-			flags |= OPT_CLASSES;
-			break;
-
-		case 'h':
-			flags |= OPT_HELP;
-			break;
-
-		case 'v':
-			flags |= OPT_VERSION;
-			break;
-		/*
-			TODO 
-			add gpio check flags
-		*/
-		}
-	}
-
-	if (flags & OPT_CLASSES)
-		print_classes();
+            case 'h':
+            	flags |= OPT_HELP;
+                break;
+            case 'v':
+            	flags = OPT_VERSION;
+                break;
+            case 'c':
+                flags |= OPT_CLASSES;
+                break;
+        }
+    }
 
 	if (flags & OPT_HELP)
 		usage();
@@ -168,9 +157,13 @@ int dtsinfo_main(int argc, char **argv)
 	if (flags & OPT_VERSION)
 		print_version();
 
+	if (flags & OPT_CLASSES)
+		print_classes();
+
 	if (!flags)
 		print_devicetree();
 
 	printf("\n");
 	return 0;
 }
+
