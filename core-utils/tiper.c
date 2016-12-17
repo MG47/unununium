@@ -14,10 +14,10 @@ static void usage()
 {
 	printf("tiper:\n");
 	printf("Usage: "
-            "./tiper [OPTIONS] [FILE]\n"
-            "OPTIONS:\n"
-			"-h - Usage\n"
-			"-v - Version\n"); 
+		"./tiper [OPTIONS] [FILE]\n"
+		"OPTIONS:\n"
+		"-h - Usage\n"
+		"-v - Version\n"); 
 }
 
 static void print_version()
@@ -45,19 +45,18 @@ static int init_console()
 
 int tiper_main(int argc, char **argv)
 {
-    int opt;
+	int opt;
 	char *file_string;
 	FILE *stream;
 
 	printf("\nTiper Text Editor :\n\n");
-
 	if (argc < 2) {
 		usage();
 		return 0;
 	}
 
-    while ((opt = getopt(argc, argv, "hv")) != -1) {
-        switch (opt) {
+	while ((opt = getopt(argc, argv, "hv")) != -1) {
+		switch (opt) {
 		case 'h':
 			usage();
 			return 0;

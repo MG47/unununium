@@ -23,9 +23,9 @@ static void usage()
 {
 	printf("dtsinfo");
 	printf("Usage: "
-            "./dtsinfo [OPTIONS]\n"
-            "OPTIONS:\n"
-            "-c - Print classes\n"
+			"./dtsinfo [OPTIONS]\n"
+			"OPTIONS:\n"
+			"-c - Print classes\n"
 			"-h - Usage\n"
 			"-v - Version\n"); 
 }
@@ -135,25 +135,25 @@ static void print_devicetree()
 int dtsinfo_main(int argc, char **argv)
 {
 	int flags = 0;
-    int opt;
+	int opt;
 
-    if(argc > 1) {
-	    while ((opt = getopt(argc, argv, "hvc")) != -1) {
-	        switch (opt) {
-            case 'h':
-            	flags |= OPT_HELP;
-                break;
-            case 'v':
-            	flags = OPT_VERSION;
-                break;
-            case 'c':
-                flags |= OPT_CLASSES;
-                break;
-            default:
-            	flags |= OPT_HELP;
-            	break;
-	        }
-	    }
+	if(argc > 1) {
+		while ((opt = getopt(argc, argv, "hvc")) != -1) {
+			switch (opt) {
+			case 'h':
+				flags |= OPT_HELP;
+				break;
+			case 'v':
+				flags = OPT_VERSION;
+				break;
+			case 'c':
+				flags |= OPT_CLASSES;
+				break;
+			default:
+				flags |= OPT_HELP;
+				break;
+			}
+		}
 
 		if (flags & OPT_HELP)
 			usage();
