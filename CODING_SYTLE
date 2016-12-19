@@ -1,0 +1,9 @@
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+CODING STYLE
+
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+-Follow Linux Kernel Coding Style : https://www.kernel.org/doc/Documentation/CodingStyle
+-Rationale behind most of the coding style: Dennis Ritchie & Brian Kernighan
+
