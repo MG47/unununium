@@ -10,6 +10,9 @@
 #define REVISION 1
 #define TOOL_NAME "tiper"
 
+static FILE *stream;
+static int maxrow, maxcol;
+static int row, col;
 static void usage()
 {
 	printf("tiper:\n");
@@ -25,21 +28,36 @@ static void print_version()
 	printf("%s version:%d.%d\n",TOOL_NAME, VERSION, REVISION);
 }
 
+static void signal_handler(int signo)
+{
+	if (signo == SIGINT) {
+		endwin();
+		fflush(stream);
+		exit(EXIT_FAILURE);
+	}
+}
+
 static FILE *parse_file(char *filename)
 {
-	FILE *stream;
 	/* TODO parse path and filename */
-	stream = fopen(filename, "a+");
+	stream = fopen(filename, "w+");
 	if (!stream) {
 		printf("error: %s\n", strerror(errno));
 		return NULL;
 	}
-
 	return stream;
 }
 
 static int init_console()
 {
+	initscr();
+	cbreak();
+	noecho();
+	keypad(stdscr, TRUE);
+	getmaxyx(stdscr, maxcol, maxrow);
+	getyx(stdscr, col, row);
+	printw("Tiper Text Editor %d.%d\n", TIPER_VERSION, TIPER_REVISION);
+	refresh();
 	return 0;
 }
 
@@ -47,7 +65,6 @@ int tiper_main(int argc, char **argv)
 {
 	int opt;
 	char *file_string;
-	FILE *stream;
 
 	printf("\nTiper Text Editor :\n\n");
 	if (argc < 2) {
@@ -65,19 +82,22 @@ int tiper_main(int argc, char **argv)
 			return 0;
 		}
 	}
-		
+
 	file_string = argv[1];
-	// open dir/parse/create file function, check permissions
 
 	stream = parse_file(file_string);
 	if (!stream)
 		return 0;
 
+	if (signal(SIGINT, signal_handler) == SIG_ERR) {
+		printf("Error: Cannot handle signal SIGNINT");
+		return 0;
+	}
+
 	if (init_console())
 		return 0;
 
-	char *read;
-	read = malloc(sizeof(char *) * 10);
+	int read;
 
 	while (1) {
 	// threaded:
@@ -87,9 +107,36 @@ int tiper_main(int argc, char **argv)
 	// input and interpret keys
 		// save load exit find 
 	// close resources	 	
-		read[0] = fgetc(stdin);
-		printf("read %s\n", read);
-		fputs(read, stream);break;
+		read = getch();
+		switch(read) {
+		case KEY_LEFT:
+			if (col > 0) {
+				col--;
+				move(row, col);
+			}
+			break;
+		case KEY_RIGHT:
+			if (col < maxcol) {
+				col++;
+				move(row, col);
+			}
+			break;
+		case KEY_UP:
+			if (row > 0) {
+				row--;
+				move(row, col);
+			}
+			break;
+		case KEY_DOWN:
+			if (row < maxrow) {
+				row++;
+				move(row, col);
+			}
+			break;
+		}
+		continue;
+		printw("%c", read);
+		refresh();
 	}
 	return 0;
 }

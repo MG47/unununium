@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <ncurses.h>
 
 #define UTILITY_COUNT 2
 
