@@ -46,8 +46,9 @@ static void print_version()
 static void signal_handler(int signo)
 {
 	if (signo == SIGINT) {
+		erase();
+		refresh();
 		endwin();
-		fflush(stream);
 		exit(EXIT_FAILURE);
 	}
 }
@@ -60,12 +61,15 @@ static void resize_handler(int sig)
 
 static FILE *parse_file(char *filename)
 {
-	int i;
-	/* TODO parse path and filename, open in write mode */
-	stream = fopen(filename, "r");
+	int i, new_file = 0;
+	stream = fopen(filename, "r+");
 	if (!stream) {
-		printf("error: %s\n", strerror(errno));
-		return NULL;
+		stream = fopen(filename, "w+");
+		if (!stream) {
+			printf("error: %s\n", strerror(errno));
+			return NULL;
+		}
+		new_file = 1;
 	}
 
 	i = 0;
@@ -74,12 +78,22 @@ static FILE *parse_file(char *filename)
 		buffer.buf[i] = malloc(sizeof(char) * 20);
 	}
 
+	// TODO fix this
+#if 0
+	if (new_file)
+		return stream;
+#endif
 	i = 0;
-	while (fgets(buffer.buf[i], 30, stream) != NULL) {
+	while (fgets(buffer.buf[i], 30, stream) != NULL)
 		i++;
-		fputs(buffer.buf[i], stdout);
-	}
+
 	buffer.buffer_lines = i;
+	
+	if (buffer.buffer_lines > 24) {
+		printf("error: tiper can only handle files with less than %d lines currently\n", 24);
+		exit(EXIT_FAILURE);
+	}
+
 	printf("lines in file %d\n", buffer.buffer_lines);
 
 	return stream;
@@ -91,13 +105,11 @@ static int init_console()
 	cbreak();
 	noecho();
 	keypad(stdscr, TRUE);
-	getmaxyx(stdscr, maxcol, maxrow);
-	getyx(stdscr, row, col);
+	getmaxyx(stdscr, maxrow, maxcol);
 	attron(A_REVERSE);
-	mvprintw(maxcol-5, maxrow/2, "Tiper Text Editor %d.%d\n", TIPER_VERSION, TIPER_REVISION);
-	mvprintw(maxcol-4, maxrow/2, "Shortcuts");
-	mvprintw(maxcol-3, maxrow/2, "Save and Exit: Ctrl+X");
-	clrtoeol();
+	mvprintw(maxrow-5, maxcol/2, "Tiper Text Editor %d.%d\n", TIPER_VERSION, TIPER_REVISION);
+	mvprintw(maxrow-4, maxcol/2, "Shortcuts");
+	mvprintw(maxrow-3, maxcol/2, "Save and Exit: Ctrl+X");
 	attroff(A_REVERSE);
 	refresh();
 	return 0;
@@ -106,7 +118,7 @@ static int init_console()
 static void print_contents() 
 {
 	int i;
-	for (i = 0; i < buffer.buffer_lines; i++)
+	for (i = 0; i < buffer.buffer_lines; i++) 
 		mvprintw(i, 0, "%s", buffer.buf[i]);
 	refresh();
 }
@@ -119,9 +131,16 @@ static int process_input(int read)
 #endif
 static int save_and_exit()
 {
+	erase();
+	refresh();
 	endwin();
-	fflush(stream);
+
+// TODO change this 
 	int i;
+	for (i = 0; i < buffer.buffer_lines; i++)
+		fputs(buffer.buf[i], stream);
+	fflush(stream);
+
 	for (i = 0; i < buffer.buffer_lines; i++)
 		free(buffer.buf[i]);
 	free(buffer.buf);
@@ -170,9 +189,12 @@ int tiper_main(int argc, char **argv)
 #endif
 
 	init_console();
+	move(0, 0);
+	row = 0;
+	col = 0;
 	print_contents();
 
-	while (1) {
+	while (1) {	
 	// read char, write char
 	// update cursor
 	// input and interpret keys
@@ -219,7 +241,9 @@ int tiper_main(int argc, char **argv)
 		case KEY_F(2):
 			break;
 		default:
-			addch(read);
+			getyx(stdscr, row, col);
+			mvaddch(row, col, read);
+			buffer.buf[row][col] = read;
 		}
 			refresh();
 	}
