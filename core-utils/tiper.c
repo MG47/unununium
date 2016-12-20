@@ -36,6 +36,17 @@ static void signal_handler(int signo)
 		exit(EXIT_FAILURE);
 	}
 }
+#if 0
+static void resize_handler(int sig)
+{
+
+}
+#endif
+
+/*TODO Test this*/
+#ifndef CTRL
+#define CTRL(x) ((x) & 0x1f)
+#endif
 
 static FILE *parse_file(char *filename)
 {
@@ -55,16 +66,32 @@ static int init_console()
 	noecho();
 	keypad(stdscr, TRUE);
 	getmaxyx(stdscr, maxcol, maxrow);
-	getyx(stdscr, col, row);
-	printw("Tiper Text Editor %d.%d\n", TIPER_VERSION, TIPER_REVISION);
+	getyx(stdscr, row, col);
+	attron(A_REVERSE);
+	mvprintw(maxcol-5, maxrow/2, "Tiper Text Editor %d.%d\n", TIPER_VERSION, TIPER_REVISION);
+	mvprintw(maxcol-4, maxrow/2, "Shortcuts");
+	mvprintw(maxcol-3, maxrow/2, "Save and Exit: Ctrl+X");
+	clrtoeol();
+	attroff(A_REVERSE);
 	refresh();
 	return 0;
+}
+
+static int process_input(int read)
+{
+	return 0;
+}
+
+static int save_and_exit()
+{
+	exit(EXIT_SUCCESS);
 }
 
 int tiper_main(int argc, char **argv)
 {
 	int opt;
-	char *file_string;
+	char *file_string;	
+	int read;
 
 	printf("\nTiper Text Editor :\n\n");
 	if (argc < 2) {
@@ -84,7 +111,6 @@ int tiper_main(int argc, char **argv)
 	}
 
 	file_string = argv[1];
-
 	stream = parse_file(file_string);
 	if (!stream)
 		return 0;
@@ -94,21 +120,24 @@ int tiper_main(int argc, char **argv)
 		return 0;
 	}
 
-	if (init_console())
+#if 0
+	if (signal(SIGWINCH, resize_handler) == SIG_ERR) {
+		printf("Error: Cannot handle signal SIGNINT");
 		return 0;
+	}
+#endif
 
-	int read;
+	init_console();
 
 	while (1) {
-	// threaded:
-	// open console window 
 	// read char, write char
 	// update cursor
 	// input and interpret keys
 		// save load exit find 
 	// close resources	 	
 		read = getch();
-		switch(read) {
+//		process_input(read);
+		switch (read) {
 		case KEY_LEFT:
 			if (col > 0) {
 				col--;
@@ -122,7 +151,7 @@ int tiper_main(int argc, char **argv)
 			}
 			break;
 		case KEY_UP:
-			if (row > 0) {
+			if (row > 1) {
 				row--;
 				move(row, col);
 			}
@@ -133,10 +162,23 @@ int tiper_main(int argc, char **argv)
 				move(row, col);
 			}
 			break;
+		case KEY_BACKSPACE:
+			if (col > 0) {
+				col --;
+				move(row, col);
+			}
+			break;
+		case CTRL('x'):
+			save_and_exit();
+			break;			
+		case KEY_F(1):
+			break;
+		case KEY_F(2):
+			break;
+		default:
+			addch(read);
 		}
-		continue;
-		printw("%c", read);
-		refresh();
+			refresh();
 	}
 	return 0;
 }
