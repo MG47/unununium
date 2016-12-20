@@ -13,6 +13,21 @@
 static FILE *stream;
 static int maxrow, maxcol;
 static int row, col;
+
+/* TODO Change this */
+
+/*TODO Test this*/
+#ifndef CTRL
+#define CTRL(x) ((x) & 0x1f)
+#endif
+
+struct file_buffer {
+	char **buf;
+	int buffer_lines;
+};
+
+static struct file_buffer buffer;
+
 static void usage()
 {
 	printf("tiper:\n");
@@ -39,23 +54,34 @@ static void signal_handler(int signo)
 #if 0
 static void resize_handler(int sig)
 {
-
+	// handle SIGWINCH
 }
-#endif
-
-/*TODO Test this*/
-#ifndef CTRL
-#define CTRL(x) ((x) & 0x1f)
 #endif
 
 static FILE *parse_file(char *filename)
 {
-	/* TODO parse path and filename */
-	stream = fopen(filename, "w+");
+	int i;
+	/* TODO parse path and filename, open in write mode */
+	stream = fopen(filename, "r");
 	if (!stream) {
 		printf("error: %s\n", strerror(errno));
 		return NULL;
 	}
+
+	i = 0;
+	buffer.buf = (char **)malloc(300 * sizeof(char *));
+	for (i = 0; i < 3000; i++) {
+		buffer.buf[i] = malloc(sizeof(char) * 20);
+	}
+
+	i = 0;
+	while (fgets(buffer.buf[i], 30, stream) != NULL) {
+		i++;
+		fputs(buffer.buf[i], stdout);
+	}
+	buffer.buffer_lines = i;
+	printf("lines in file %d\n", buffer.buffer_lines);
+
 	return stream;
 }
 
@@ -77,13 +103,29 @@ static int init_console()
 	return 0;
 }
 
+static void print_contents() 
+{
+	int i;
+	for (i = 0; i < buffer.buffer_lines; i++)
+		mvprintw(i, 0, "%s", buffer.buf[i]);
+	refresh();
+}
+
+#if 0
 static int process_input(int read)
 {
 	return 0;
 }
-
+#endif
 static int save_and_exit()
 {
+	endwin();
+	fflush(stream);
+	int i;
+	for (i = 0; i < buffer.buffer_lines; i++)
+		free(buffer.buf[i]);
+	free(buffer.buf);
+
 	exit(EXIT_SUCCESS);
 }
 
@@ -128,6 +170,7 @@ int tiper_main(int argc, char **argv)
 #endif
 
 	init_console();
+	print_contents();
 
 	while (1) {
 	// read char, write char
