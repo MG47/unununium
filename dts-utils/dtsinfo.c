@@ -108,11 +108,18 @@ static void print_devicetree()
 	direntp = &entry;
 
 	i = 0;
+	errno = 0;
 	while (((ent = readdir(dir)) != NULL) && (i < 20)) {
 		if ((strcmp(ent->d_name, ".")) && (strcmp((ent->d_name), ".."))) {
 			(*direntp)[i] = ent;
 		}
 		i++;
+	}
+
+	/* To differentiate between readdir() error and end of directory entries */
+	if (errno && !ent) {
+		printf("error: %s\n", strerror(errno));
+		return;
 	}
 
 	count = i;
