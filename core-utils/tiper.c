@@ -74,8 +74,8 @@ static FILE *parse_file(char *filename)
 
 	i = 0;
 	buffer.buf = (char **)malloc(300 * sizeof(char *));
-	for (i = 0; i < 3000; i++) {
-		buffer.buf[i] = malloc(sizeof(char) * 20);
+	for (i = 0; i < 300; i++) {
+		buffer.buf[i] = malloc(sizeof(char) * 80);
 	}
 
 	// TODO fix this
@@ -84,7 +84,7 @@ static FILE *parse_file(char *filename)
 		return stream;
 #endif
 	i = 0;
-	while (fgets(buffer.buf[i], 30, stream) != NULL)
+	while (fgets(buffer.buf[i], 80, stream) != NULL)
 		i++;
 
 	buffer.buffer_lines = i;
@@ -107,7 +107,7 @@ static int init_console()
 	keypad(stdscr, TRUE);
 	getmaxyx(stdscr, maxrow, maxcol);
 	attron(A_REVERSE);
-	mvprintw(maxrow-5, maxcol/2, "Tiper Text Editor %d.%d\n", TIPER_VERSION, TIPER_REVISION);
+	mvprintw(maxrow-5, maxcol/2, "Tiper Text Editor (%d.%d)\n", TIPER_VERSION, TIPER_REVISION);
 	mvprintw(maxrow-4, maxcol/2, "Shortcuts");
 	mvprintw(maxrow-3, maxcol/2, "Save and Exit: Ctrl+X");
 	attroff(A_REVERSE);
@@ -117,19 +117,14 @@ static int init_console()
 
 static void print_contents() 
 {
+	move(0, 0);
 	int i;
 	for (i = 0; i < buffer.buffer_lines; i++) 
 		mvprintw(i, 0, "%s", buffer.buf[i]);
 	refresh();
 }
 
-#if 0
-static int process_input(int read)
-{
-	return 0;
-}
-#endif
-static int save_and_exit()
+static void save_and_exit()
 {
 	erase();
 	refresh();
@@ -146,6 +141,58 @@ static int save_and_exit()
 	free(buffer.buf);
 
 	exit(EXIT_SUCCESS);
+}
+
+static void process_input(int read)
+{
+	switch (read) {
+	case KEY_LEFT:
+		if (col > 0) {
+			col--;
+			move(row, col);
+		}
+		break;
+	case KEY_RIGHT:
+	// * TODO find length
+		if (col < maxcol && col < ((int)strlen(buffer.buf[row]) - 1)) {
+			col++;
+			move(row, col);
+		}
+		break;
+	case KEY_UP:
+		if (row > 0)
+			row--;
+		if (col > ((int)strlen(buffer.buf[row]) - 1))
+			col = ((int)strlen(buffer.buf[row]) - 1);
+		move(row, col);
+		break;
+	case KEY_DOWN:
+		if (row < buffer.buffer_lines)
+			row++;
+		// TODO Fix this
+//		if (col > ((int)strlen(buffer.buf[row]) - 1))
+//			col = ((int)strlen(buffer.buf[row]) - 1);
+			col = 0;
+		move(row, col);
+		break;
+	case KEY_BACKSPACE:
+		if (col > 0) {
+			col --;
+			move(row, col);
+		}
+		break;
+	case CTRL('x'):
+		save_and_exit();
+		break;			
+	case KEY_F(1):
+		break;
+	case KEY_F(2):
+		break;
+	default:
+		buffer.buf[row][col] = (char)read;
+		addch(read);
+		col++;
+	}
 }
 
 int tiper_main(int argc, char **argv)
@@ -189,63 +236,14 @@ int tiper_main(int argc, char **argv)
 #endif
 
 	init_console();
-	move(0, 0);
-	row = 0;
-	col = 0;
 	print_contents();
+	move(0, 0);
+	row = 0; col = 0;
 
 	while (1) {	
-	// read char, write char
-	// update cursor
-	// input and interpret keys
-		// save load exit find 
-	// close resources	 	
 		read = getch();
-//		process_input(read);
-		switch (read) {
-		case KEY_LEFT:
-			if (col > 0) {
-				col--;
-				move(row, col);
-			}
-			break;
-		case KEY_RIGHT:
-			if (col < maxcol) {
-				col++;
-				move(row, col);
-			}
-			break;
-		case KEY_UP:
-			if (row > 1) {
-				row--;
-				move(row, col);
-			}
-			break;
-		case KEY_DOWN:
-			if (row < maxrow) {
-				row++;
-				move(row, col);
-			}
-			break;
-		case KEY_BACKSPACE:
-			if (col > 0) {
-				col --;
-				move(row, col);
-			}
-			break;
-		case CTRL('x'):
-			save_and_exit();
-			break;			
-		case KEY_F(1):
-			break;
-		case KEY_F(2):
-			break;
-		default:
-			getyx(stdscr, row, col);
-			mvaddch(row, col, read);
-			buffer.buf[row][col] = read;
-		}
-			refresh();
+		process_input(read);
+		refresh();
 	}
 	return 0;
 }
