@@ -14,6 +14,9 @@ static FILE *stream;
 static int maxrow, maxcol;
 static int row, col;
 
+#define BUFFER_LINES 300
+#define BUFFER_COLUMNS 80
+
 /* TODO Change this */
 
 /*TODO Test this*/
@@ -61,7 +64,7 @@ static void resize_handler(int sig)
 
 static FILE *parse_file(char *filename)
 {
-	int i, new_file = 0;
+	int i;
 	stream = fopen(filename, "r+");
 	if (!stream) {
 		stream = fopen(filename, "w+");
@@ -69,33 +72,25 @@ static FILE *parse_file(char *filename)
 			printf("error: %s\n", strerror(errno));
 			return NULL;
 		}
-		new_file = 1;
 	}
 
 	i = 0;
-	buffer.buf = (char **)malloc(300 * sizeof(char *));
-	for (i = 0; i < 300; i++) {
-		buffer.buf[i] = malloc(sizeof(char) * 80);
+	buffer.buf = (char **)malloc(BUFFER_LINES * sizeof(char *));
+	for (i = 0; i < BUFFER_LINES; i++) {
+		buffer.buf[i] = malloc(sizeof(char) * BUFFER_COLUMNS);
 	}
 
-	// TODO fix this
-#if 0
-	if (new_file)
-		return stream;
-#endif
 	i = 0;
-	while (fgets(buffer.buf[i], 80, stream) != NULL)
+	while (fgets(buffer.buf[i], BUFFER_COLUMNS, stream) != NULL)
 		i++;
 
 	buffer.buffer_lines = i;
-	
 	if (buffer.buffer_lines > 24) {
 		printf("error: tiper can only handle files with less than %d lines currently\n", 24);
 		exit(EXIT_FAILURE);
 	}
 
 	printf("lines in file %d\n", buffer.buffer_lines);
-
 	return stream;
 }
 
@@ -107,9 +102,9 @@ static int init_console()
 	keypad(stdscr, TRUE);
 	getmaxyx(stdscr, maxrow, maxcol);
 	attron(A_REVERSE);
-	mvprintw(maxrow-5, maxcol/2, "Tiper Text Editor (%d.%d)\n", TIPER_VERSION, TIPER_REVISION);
-	mvprintw(maxrow-4, maxcol/2, "Shortcuts");
-	mvprintw(maxrow-3, maxcol/2, "Save and Exit: Ctrl+X");
+	mvprintw(maxrow-3, maxcol/2, "Tiper Text Editor (%d.%d)\n", TIPER_VERSION, TIPER_REVISION);
+	mvprintw(maxrow-2, maxcol/2, "Shortcuts");
+	mvprintw(maxrow-1, maxcol/2, "Save and Exit: Ctrl+X");
 	attroff(A_REVERSE);
 	refresh();
 	return 0;
@@ -117,7 +112,6 @@ static int init_console()
 
 static void print_contents() 
 {
-	move(0, 0);
 	int i;
 	for (i = 0; i < buffer.buffer_lines; i++) 
 		mvprintw(i, 0, "%s", buffer.buf[i]);
@@ -132,11 +126,12 @@ static void save_and_exit()
 
 // TODO change this 
 	int i;
+	fseek(stream, 0, SEEK_SET);
 	for (i = 0; i < buffer.buffer_lines; i++)
 		fputs(buffer.buf[i], stream);
 	fflush(stream);
 
-	for (i = 0; i < buffer.buffer_lines; i++)
+	for (i = 0; i < BUFFER_LINES; i++)
 		free(buffer.buf[i]);
 	free(buffer.buf);
 
@@ -179,8 +174,18 @@ static void process_input(int read)
 		if (col > 0) {
 			col --;
 			move(row, col);
+			delch();
 		}
 		break;
+	case KEY_DC:
+		//delete key
+		delch();
+		break;	
+	case KEY_ENTER:
+	case 10:
+		break;		
+	case CTRL('f'):
+		break;			
 	case CTRL('x'):
 		save_and_exit();
 		break;			
@@ -189,9 +194,8 @@ static void process_input(int read)
 	case KEY_F(2):
 		break;
 	default:
-		buffer.buf[row][col] = (char)read;
+		buffer.buf[row][col++] = read;
 		addch(read);
-		col++;
 	}
 }
 
@@ -236,6 +240,7 @@ int tiper_main(int argc, char **argv)
 #endif
 
 	init_console();
+	move(0, 0);
 	print_contents();
 	move(0, 0);
 	row = 0; col = 0;
