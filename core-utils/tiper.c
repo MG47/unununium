@@ -11,8 +11,8 @@
 #define TOOL_NAME "tiper"
 
 static FILE *stream;
-static int maxrow, maxcol;
-static int row, col;
+static unsigned int maxrow, maxcol;
+static unsigned int row, col;
 
 #define BUFFER_LINES 300
 #define BUFFER_COLUMNS 80
@@ -26,7 +26,7 @@ static int row, col;
 
 struct file_buffer {
 	char **buf;
-	int buffer_lines;
+	unsigned int buffer_lines;
 };
 
 static struct file_buffer buffer;
@@ -64,7 +64,7 @@ static void resize_handler(int sig)
 
 static FILE *parse_file(char *filename)
 {
-	int i;
+	unsigned int i;
 	stream = fopen(filename, "r+");
 	if (!stream) {
 		stream = fopen(filename, "w+");
@@ -112,7 +112,7 @@ static int init_console()
 
 static void print_contents() 
 {
-	int i;
+	unsigned int i;
 	for (i = 0; i < buffer.buffer_lines; i++) 
 		mvprintw(i, 0, "%s", buffer.buf[i]);
 	refresh();
@@ -125,10 +125,11 @@ static void save_and_exit()
 	endwin();
 
 // TODO change this 
-	int i;
+	unsigned int i;
 	fseek(stream, 0, SEEK_SET);
-	for (i = 0; i < buffer.buffer_lines; i++)
+	for (i = 0; i < buffer.buffer_lines; i++) {
 		fputs(buffer.buf[i], stream);
+	}
 	fflush(stream);
 
 	for (i = 0; i < BUFFER_LINES; i++)
@@ -136,6 +137,16 @@ static void save_and_exit()
 	free(buffer.buf);
 
 	exit(EXIT_SUCCESS);
+}
+
+static void removeChar(char *str, char remove) {
+
+    char *src, *dst;
+    for (src = dst = str; *src != '\0'; src++) {
+        *dst = *src;
+        if (*dst != remove) dst++;
+    }
+    *dst = '\0';
 }
 
 static void process_input(int read)
@@ -149,7 +160,7 @@ static void process_input(int read)
 		break;
 	case KEY_RIGHT:
 	// * TODO find length
-		if (col < maxcol && col < ((int)strlen(buffer.buf[row]) - 1)) {
+		if (col < maxcol && col < (strlen(buffer.buf[row]) - 1)) {
 			col++;
 			move(row, col);
 		}
@@ -157,30 +168,36 @@ static void process_input(int read)
 	case KEY_UP:
 		if (row > 0)
 			row--;
-		if (col > ((int)strlen(buffer.buf[row]) - 1))
-			col = ((int)strlen(buffer.buf[row]) - 1);
+		if (col > (strlen(buffer.buf[row]) - 1))
+			col = (strlen(buffer.buf[row]) - 1);
 		move(row, col);
 		break;
 	case KEY_DOWN:
-		if (row < buffer.buffer_lines)
+		if (row <= buffer.buffer_lines)
 			row++;
 		// TODO Fix this
-//		if (col > ((int)strlen(buffer.buf[row]) - 1))
-//			col = ((int)strlen(buffer.buf[row]) - 1);
-			col = 0;
+//		if (col > (strlen(buffer.buf[row]) - 1))
+//			col = (strlen(buffer.buf[row]) - 1);
+		col = 0;
 		move(row, col);
 		break;
 	case KEY_BACKSPACE:
+	{	//delete key
 		if (col > 0) {
-			col --;
-			move(row, col);
-			delch();
+			removeChar(buffer.buf[row], buffer.buf[row][col -1]);
+			mvdelch(row, (col-1));
 		}
 		break;
+	}
 	case KEY_DC:
-		//delete key
-		delch();
-		break;	
+	{	//delete key
+		if (col <= (strlen(buffer.buf[row]) - 1)) {
+			removeChar(buffer.buf[row], buffer.buf[row][col]);
+			mvdelch(row, col);
+		}
+		break;
+	}
+
 	case KEY_ENTER:
 	case 10:
 		break;		
@@ -243,9 +260,9 @@ int tiper_main(int argc, char **argv)
 	move(0, 0);
 	print_contents();
 	move(0, 0);
-	row = 0; col = 0;
 
 	while (1) {	
+		getyx(stdscr, row, col);
 		read = getch();
 		process_input(read);
 		refresh();
