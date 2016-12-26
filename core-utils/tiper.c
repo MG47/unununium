@@ -6,8 +6,6 @@
 
 #include "utilbox.h"
 
-#define VERSION 0
-#define REVISION 1
 #define TOOL_NAME "tiper"
 
 static FILE *stream;
@@ -43,7 +41,7 @@ static void usage()
 
 static void print_version()
 {
-	printf("%s version:%d.%d\n",TOOL_NAME, VERSION, REVISION);
+	printf("%s version:%d.%d\n",TOOL_NAME, TIPER_VERSION, TIPER_REVISION);
 }
 
 static void signal_handler(int signo)
@@ -139,14 +137,27 @@ static void save_and_exit()
 	exit(EXIT_SUCCESS);
 }
 
-static void removeChar(char *str, char remove) {
+static void insert_char_at(char *str, int index, char ch)
+{
+	char *src;
+	int i;
 
-    char *src, *dst;
-    for (src = dst = str; *src != '\0'; src++) {
-        *dst = *src;
-        if (*dst != remove) dst++;
-    }
-    *dst = '\0';
+	src = str;
+	src[strlen(src) + 1] = '\0';
+	for (i = strlen(src); i > index; i--)
+		src[i] = src[i - 1];
+	src[index] = ch;
+}
+
+static void remove_char(char *str, char remove) {
+
+	char *src, *dst;
+	for (src = dst = str; *src != '\0'; src++) {
+		*dst = *src;
+		if (*dst != remove) 
+			dst++;
+	}
+	*dst = '\0';
 }
 
 static void process_input(int read)
@@ -175,32 +186,32 @@ static void process_input(int read)
 	case KEY_DOWN:
 		if (row <= buffer.buffer_lines)
 			row++;
-		// TODO Fix this
+		// TODO Android shell has a different behaviour for key_down.
 //		if (col > (strlen(buffer.buf[row]) - 1))
 //			col = (strlen(buffer.buf[row]) - 1);
 		col = 0;
 		move(row, col);
 		break;
 	case KEY_BACKSPACE:
-	{	//delete key
 		if (col > 0) {
-			removeChar(buffer.buf[row], buffer.buf[row][col -1]);
+			remove_char(buffer.buf[row], buffer.buf[row][col -1]);
 			mvdelch(row, (col-1));
 		}
-		break;
-	}
+	break;
 	case KEY_DC:
-	{	//delete key
+		//delete key
 		if (col <= (strlen(buffer.buf[row]) - 1)) {
-			removeChar(buffer.buf[row], buffer.buf[row][col]);
+			remove_char(buffer.buf[row], buffer.buf[row][col]);
 			mvdelch(row, col);
 		}
 		break;
-	}
-
 	case KEY_ENTER:
 	case 10:
-		break;		
+		insert_char_at(buffer.buf[row], col, '\n');
+		row++;
+		col = 0;
+		move(row, col);
+		break;
 	case CTRL('f'):
 		break;			
 	case CTRL('x'):
