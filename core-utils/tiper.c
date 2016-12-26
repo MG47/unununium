@@ -149,8 +149,24 @@ static void insert_char_at(char *str, int index, char ch)
 	src[index] = ch;
 }
 
-static void remove_char(char *str, char remove) {
+static void insert_newline_at(int line_num, int col)
+{
+	unsigned int lines_to_end = buffer.buffer_lines - line_num;
+	unsigned int chars_to_end = (strlen(buffer.buf[row]) - col) + 1;
 
+	buffer.buf[buffer.buffer_lines] = malloc(sizeof(char) * BUFFER_COLUMNS);
+	buffer.buffer_lines++;
+
+	memmove(buffer.buf[line_num + 1], buffer.buf[line_num], lines_to_end); 
+	strncpy(&buffer.buf[line_num + 1][0], &buffer.buf[line_num][col], chars_to_end);
+
+	insert_char_at(buffer.buf[row], col, '\n');
+	//todo check this
+	insert_char_at(buffer.buf[row], col + 1, '\0');
+}
+
+static void remove_char(char *str, char remove) 
+{
 	char *src, *dst;
 	for (src = dst = str; *src != '\0'; src++) {
 		*dst = *src;
@@ -207,10 +223,8 @@ static void process_input(int read)
 		break;
 	case KEY_ENTER:
 	case 10:
-		insert_char_at(buffer.buf[row], col, '\n');
-		row++;
-		col = 0;
-		move(row, col);
+		insert_newline_at(row, col);
+		addch('\n');
 		break;
 	case CTRL('f'):
 		break;			
