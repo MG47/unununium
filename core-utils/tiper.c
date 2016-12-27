@@ -140,6 +140,13 @@ static void save_to_file()
 	fflush(stream);
 }
 
+static void clear_screen()
+{
+  const char* CLEAR_SCREEN_ANSI =  "\e[2J\e[H";
+  write(STDOUT_FILENO, CLEAR_SCREEN_ANSI, 7);
+
+}
+
 static void save_and_exit()
 {
 	erase();
@@ -160,6 +167,7 @@ static void save_and_exit()
 		free(buffer.buf[i]);
 	free(buffer.buf);
 
+	clear_screen();
 	exit(EXIT_SUCCESS);
 }
 
@@ -183,7 +191,7 @@ static void insert_newline()
 	unsigned int lines_to_end = buffer.buffer_lines - row;
 	unsigned int chars_to_end = (strlen(buffer.buf[row]) - col) + 1;
 
-	int i;
+	unsigned int i;
 	for (i = 0; i < lines_to_end; i++) {
 		strcpy(buffer.buf[buffer.buffer_lines - i], buffer.buf[buffer.buffer_lines -i -1]);
 	}
@@ -213,8 +221,8 @@ static void remove_line()
 	remove_char(buffer.buf[row - 1], '\n');
 	strcat(buffer.buf[row - 1], buffer.buf[row]);
 
-	int i;
-	for (i = 0; i < lines_to_end; i++) {
+	unsigned int i;
+	for (i = 0; i <= lines_to_end; i++) {
 		strcpy(buffer.buf[row + i], buffer.buf[row + i + 1]);
 	}
 
@@ -281,9 +289,17 @@ static void process_input(int read)
 		break;
 	case KEY_DC:
 		//delete key
-		if (col <= (strlen(buffer.buf[row]) - 1)) {
+		// TODO fix newline check
+		if (col <= (strlen(buffer.buf[row]) - 2)) {
 			remove_char(buffer.buf[row], buffer.buf[row][col]);
-			mvdelch(row, col);
+		} else {
+			if (row < (buffer.buffer_lines)) {
+				row++;
+				col = 0;
+				move(row, col);			
+				remove_line();	
+			}
+			print_contents();
 		}
 		break;
 	case KEY_ENTER:
