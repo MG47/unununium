@@ -44,12 +44,19 @@ static void print_version()
 	printf("%s version:%d.%d\n",TOOL_NAME, TIPER_VERSION, TIPER_REVISION);
 }
 
+static void clear_screen()
+{
+  const char* CLEAR_SCREEN_ANSI =  "\e[2J\e[H";
+  write(STDOUT_FILENO, CLEAR_SCREEN_ANSI, 7);
+}
+
 static void signal_handler(int signo)
 {
 	if (signo == SIGINT) {
 		erase();
 		refresh();
 		endwin();
+		clear_screen();
 		exit(EXIT_FAILURE);
 	}
 }
@@ -67,7 +74,6 @@ static FILE *parse_file(char *filename)
 	int fd;
 
 	stream = fopen(filename, "r+");
-		printf("creating new file");
 	if (!stream) { 
 		fd = open(filename, O_RDWR | O_CREAT | O_TRUNC, 0644);
 		stream = fdopen(fd, "r+");
@@ -76,9 +82,9 @@ static FILE *parse_file(char *filename)
 			return NULL;
 		}
 		new_file = 1;
-		printf("created new file");
 	}
 
+	/* TODO need to fix allocation */
 	i = 0;
 	buffer.buf = (char **)malloc(BUFFER_LINES * sizeof(char *));
 	for (i = 0; i < BUFFER_LINES; i++) {
@@ -94,7 +100,7 @@ static FILE *parse_file(char *filename)
 	while (fgets(buffer.buf[i], BUFFER_COLUMNS, stream) != NULL)
 		i++;
 
-	buffer.buffer_lines = i;
+	buffer.buffer_lines = i + 1;
 	if (buffer.buffer_lines > 24) {
 		printf("error: tiper can only handle files with less than %d lines currently\n", 24);
 		exit(EXIT_FAILURE);
@@ -103,7 +109,7 @@ static FILE *parse_file(char *filename)
 	return stream;
 }
 
-static int init_console()
+static void init_console()
 {
 	initscr();
 	cbreak();
@@ -118,11 +124,17 @@ static int init_console()
 	mvprintw(maxrow-2, 3*maxcol/4, "Exit: Ctrl+c");
 	attroff(A_REVERSE);
 	refresh();
-	return 0;
+}
+
+static void print_line(int line_no) 
+{
+	mvprintw(line_no, 0, "%s", buffer.buf[line_no]);
+	refresh();
 }
 
 static void print_contents() 
 {
+	clear();
 	unsigned int i;
 	for (i = 0; i < buffer.buffer_lines; i++) 
 		mvprintw(i, 0, "%s", buffer.buf[i]);
@@ -140,32 +152,19 @@ static void save_to_file()
 	fflush(stream);
 }
 
-static void clear_screen()
-{
-  const char* CLEAR_SCREEN_ANSI =  "\e[2J\e[H";
-  write(STDOUT_FILENO, CLEAR_SCREEN_ANSI, 7);
-
-}
-
 static void save_and_exit()
 {
 	erase();
 	refresh();
 	endwin();
 
-// TODO change this 
 	unsigned int i;
 
-//	buffer.buf[0] = "hello";
 	fseek(stream, 0, SEEK_SET);
 	for (i = 0; i < buffer.buffer_lines; i++) {
 		fputs(buffer.buf[i], stream);
 	}
 	fflush(stream);
-
-	for (i = 0; i < BUFFER_LINES; i++)
-		free(buffer.buf[i]);
-	free(buffer.buf);
 
 	clear_screen();
 	exit(EXIT_SUCCESS);
@@ -185,22 +184,23 @@ static void insert_char_at(char *str, int index, char ch)
 
 static void insert_newline()
 {
-	buffer.buf[buffer.buffer_lines] = malloc(sizeof(char) * BUFFER_COLUMNS);
-	buffer.buffer_lines++;
+	unsigned int lines_to_end = (buffer.buffer_lines - 1) - row;
+	unsigned int chars_to_end = (strlen(buffer.buf[row]) + 1) - col ;
 
-	unsigned int lines_to_end = buffer.buffer_lines - row;
-	unsigned int chars_to_end = (strlen(buffer.buf[row]) - col) + 1;
+	// TODO fix this
+	if (!buffer.buf)
+		buffer.buf[buffer.buffer_lines] = malloc(sizeof(char) * BUFFER_COLUMNS);
 
 	unsigned int i;
 	for (i = 0; i < lines_to_end; i++) {
-		strcpy(buffer.buf[buffer.buffer_lines - i], buffer.buf[buffer.buffer_lines -i -1]);
+		strcpy(buffer.buf[buffer.buffer_lines - i], buffer.buf[buffer.buffer_lines - i - 1]);
 	}
 
-	strncpy(&buffer.buf[row + 1][0], &buffer.buf[row][col], chars_to_end);
+	buffer.buffer_lines++;
 
-	insert_char_at(buffer.buf[row], col, '\n');
-	//todo check this
-	insert_char_at(buffer.buf[row], col + 1, '\0');
+	strncpy(&buffer.buf[row + 1][0], &buffer.buf[row][col], chars_to_end);
+	buffer.buf[row][col] = '\n';
+	buffer.buf[row][col + 1] = '\0';
 }
 
 static void remove_char(char *str, char remove) 
@@ -216,13 +216,14 @@ static void remove_char(char *str, char remove)
 
 static void remove_line()
 {
-	unsigned int lines_to_end = buffer.buffer_lines - row - 1;
+	unsigned int lines_to_end = (buffer.buffer_lines - 1) - row;
 
 	remove_char(buffer.buf[row - 1], '\n');
 	strcat(buffer.buf[row - 1], buffer.buf[row]);
 
 	unsigned int i;
-	for (i = 0; i <= lines_to_end; i++) {
+	// TODO confirm this
+	for (i = 0; i < lines_to_end; i++) {
 		strcpy(buffer.buf[row + i], buffer.buf[row + i + 1]);
 	}
 
@@ -274,15 +275,15 @@ static void process_input(int read)
 	case KEY_BACKSPACE:
 		if (col > 0) {
 			remove_char(buffer.buf[row], buffer.buf[row][col -1]);
-			mvdelch(row, col-1);
-//			col--;
-//			move(row, col);
+			mvdelch(row, col - 1);
+			col--;
+			move(row, col);
 		} else {
 			if (row > 0) {
 				remove_line();
 				print_contents();
 				row--;
-				col = (strlen(buffer.buf[row]) - 1);
+				col = (strlen(buffer.buf[row]));
 				move(row, col);
 			}
 		}
@@ -292,14 +293,17 @@ static void process_input(int read)
 		// TODO fix newline check
 		if (col <= (strlen(buffer.buf[row]) - 2)) {
 			remove_char(buffer.buf[row], buffer.buf[row][col]);
+			delch();
 		} else {
-			if (row < (buffer.buffer_lines)) {
+			if (row < (buffer.buffer_lines - 1)) {
+				unsigned int oldrow = row;
+				unsigned int oldcol = col;
 				row++;
 				col = 0;
-				move(row, col);			
-				remove_line();	
+				remove_line();
+				print_contents();
+				move(oldrow, oldcol);	
 			}
-			print_contents();
 		}
 		break;
 	case KEY_ENTER:
@@ -323,8 +327,12 @@ static void process_input(int read)
 	case KEY_F(2):
 		break;
 	default:
-		buffer.buf[row][col++] = read;
-		addch(read);
+		if (col < maxcol) {
+			insert_char_at(buffer.buf[row], col, read);
+			print_line(row);
+			col++;
+			move(row, col);
+		}
 	}
 }
 
@@ -334,7 +342,7 @@ int tiper_main(int argc, char **argv)
 	char *file_string;	
 	int read;
 
-	printf("\nTiper Text Editor :\n\n");
+	printf("\nTiper Text Editor :\n");
 	if (argc < 2) {
 		usage();
 		return 0;
