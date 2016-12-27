@@ -206,21 +206,46 @@ static void remove_char(char *str, char remove)
 	*dst = '\0';
 }
 
+static void remove_line()
+{
+	unsigned int lines_to_end = buffer.buffer_lines - row - 1;
+
+	remove_char(buffer.buf[row - 1], '\n');
+	strcat(buffer.buf[row - 1], buffer.buf[row]);
+
+	int i;
+	for (i = 0; i < lines_to_end; i++) {
+		strcpy(buffer.buf[row + i], buffer.buf[row + i + 1]);
+	}
+
+	free(buffer.buf[buffer.buffer_lines - 1]);
+	buffer.buffer_lines--;
+}
+
 static void process_input(int read)
 {
 	switch (read) {
 	case KEY_LEFT:
 		if (col > 0) {
 			col--;
-			move(row, col);
+		} else {
+			if (row > 0) {
+				row--;
+				col = strlen(buffer.buf[row]) - 1;
+			} 
 		}
+		move(row, col);
 		break;
 	case KEY_RIGHT:
-	// * TODO find length
 		if (col < maxcol && col < (strlen(buffer.buf[row]) - 1)) {
 			col++;
-			move(row, col);
+		} else {
+			if (row < (buffer.buffer_lines - 1)) {
+				row++;
+				col = 0;
+			}
 		}
+		move(row, col);
 		break;
 	case KEY_UP:
 		if (row > 0)
@@ -241,9 +266,19 @@ static void process_input(int read)
 	case KEY_BACKSPACE:
 		if (col > 0) {
 			remove_char(buffer.buf[row], buffer.buf[row][col -1]);
-			mvdelch(row, (col-1));
+			mvdelch(row, col-1);
+//			col--;
+//			move(row, col);
+		} else {
+			if (row > 0) {
+				remove_line();
+				print_contents();
+				row--;
+				col = (strlen(buffer.buf[row]) - 1);
+				move(row, col);
+			}
 		}
-	break;
+		break;
 	case KEY_DC:
 		//delete key
 		if (col <= (strlen(buffer.buf[row]) - 1)) {
