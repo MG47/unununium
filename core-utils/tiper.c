@@ -111,9 +111,11 @@ static int init_console()
 	keypad(stdscr, TRUE);
 	getmaxyx(stdscr, maxrow, maxcol);
 	attron(A_REVERSE);
-	mvprintw(maxrow-3, maxcol/2, "Tiper Text Editor (%d.%d)\n", TIPER_VERSION, TIPER_REVISION);
-	mvprintw(maxrow-2, maxcol/2, "Shortcuts");
-	mvprintw(maxrow-1, maxcol/2, "Save and Exit: Ctrl+X");
+	mvprintw(maxrow-2, maxcol/4, "Tiper Text Editor (%d.%d)\n", TIPER_VERSION, TIPER_REVISION);
+	mvprintw(maxrow-1, maxcol/4, "Shortcuts");
+	mvprintw(maxrow-2, maxcol/2, "Save and Exit: Ctrl+x");
+	mvprintw(maxrow-1, maxcol/2, "Save: Ctrl+i");
+	mvprintw(maxrow-2, 3*maxcol/4, "Exit: Ctrl+c");
 	attroff(A_REVERSE);
 	refresh();
 	return 0;
@@ -125,6 +127,17 @@ static void print_contents()
 	for (i = 0; i < buffer.buffer_lines; i++) 
 		mvprintw(i, 0, "%s", buffer.buf[i]);
 	refresh();
+}
+
+static void save_to_file()
+{
+	//todo add newline at end
+	unsigned int i;
+	fseek(stream, 0, SEEK_SET);
+	for (i = 0; i < buffer.buffer_lines; i++) {
+		fputs(buffer.buf[i], stream);
+	}
+	fflush(stream);
 }
 
 static void save_and_exit()
@@ -162,16 +175,20 @@ static void insert_char_at(char *str, int index, char ch)
 	src[index] = ch;
 }
 
-static void insert_newline_at(int line_num, int col)
+static void insert_newline()
 {
-	unsigned int lines_to_end = buffer.buffer_lines - line_num;
-	unsigned int chars_to_end = (strlen(buffer.buf[row]) - col) + 1;
-
 	buffer.buf[buffer.buffer_lines] = malloc(sizeof(char) * BUFFER_COLUMNS);
 	buffer.buffer_lines++;
 
-	memmove(buffer.buf[line_num + 1], buffer.buf[line_num], lines_to_end); 
-	strncpy(&buffer.buf[line_num + 1][0], &buffer.buf[line_num][col], chars_to_end);
+	unsigned int lines_to_end = buffer.buffer_lines - row;
+	unsigned int chars_to_end = (strlen(buffer.buf[row]) - col) + 1;
+
+	int i;
+	for (i = 0; i < lines_to_end; i++) {
+		strcpy(buffer.buf[buffer.buffer_lines - i], buffer.buf[buffer.buffer_lines -i -1]);
+	}
+
+	strncpy(&buffer.buf[row + 1][0], &buffer.buf[row][col], chars_to_end);
 
 	insert_char_at(buffer.buf[row], col, '\n');
 	//todo check this
@@ -213,7 +230,7 @@ static void process_input(int read)
 		move(row, col);
 		break;
 	case KEY_DOWN:
-		if (row <= buffer.buffer_lines)
+		if (row < (buffer.buffer_lines - 1))
 			row++;
 		// TODO Android shell has a different behaviour for key_down.
 //		if (col > (strlen(buffer.buf[row]) - 1))
@@ -236,13 +253,16 @@ static void process_input(int read)
 		break;
 	case KEY_ENTER:
 	case 10:
-		insert_newline_at(row, col);
+		insert_newline();
+		print_contents();
 		row++;
 		col = 0;
 		move(row, col);
-//		print_contents();
 		break;
 	case CTRL('f'):
+		break;			
+	case CTRL('i'):
+		save_to_file();
 		break;			
 	case CTRL('x'):
 		save_and_exit();
