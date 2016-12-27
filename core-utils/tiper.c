@@ -63,19 +63,31 @@ static void resize_handler(int sig)
 static FILE *parse_file(char *filename)
 {
 	unsigned int i;
+	int new_file = 0;
+	int fd;
+
 	stream = fopen(filename, "r+");
-	if (!stream) {
-		stream = fopen(filename, "w+");
+		printf("creating new file");
+	if (!stream) { 
+		fd = open(filename, O_RDWR | O_CREAT | O_TRUNC, 0644);
+		stream = fdopen(fd, "r+");
 		if (!stream) {
-			printf("error: %s\n", strerror(errno));
+			perror("Error");
 			return NULL;
 		}
+		new_file = 1;
+		printf("created new file");
 	}
 
 	i = 0;
 	buffer.buf = (char **)malloc(BUFFER_LINES * sizeof(char *));
 	for (i = 0; i < BUFFER_LINES; i++) {
 		buffer.buf[i] = malloc(sizeof(char) * BUFFER_COLUMNS);
+	}
+
+	if (new_file) {
+		buffer.buffer_lines = 1;
+		return stream;
 	}
 
 	i = 0;
@@ -88,7 +100,6 @@ static FILE *parse_file(char *filename)
 		exit(EXIT_FAILURE);
 	}
 
-	printf("lines in file %d\n", buffer.buffer_lines);
 	return stream;
 }
 
@@ -124,6 +135,8 @@ static void save_and_exit()
 
 // TODO change this 
 	unsigned int i;
+
+//	buffer.buf[0] = "hello";
 	fseek(stream, 0, SEEK_SET);
 	for (i = 0; i < buffer.buffer_lines; i++) {
 		fputs(buffer.buf[i], stream);
@@ -224,7 +237,10 @@ static void process_input(int read)
 	case KEY_ENTER:
 	case 10:
 		insert_newline_at(row, col);
-		addch('\n');
+		row++;
+		col = 0;
+		move(row, col);
+//		print_contents();
 		break;
 	case CTRL('f'):
 		break;			

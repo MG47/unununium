@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <ncurses.h>
+#include <fcntl.h>
 
 #define UTILITY_COUNT 2
 
