@@ -46,8 +46,8 @@ static void print_version()
 
 static void clear_screen()
 {
-  const char* CLEAR_SCREEN_ANSI =  "\e[2J\e[H";
-  write(STDOUT_FILENO, CLEAR_SCREEN_ANSI, 7);
+	const char* CLEAR_SCREEN_ANSI =  "\e[2J\e[H";
+	write(STDOUT_FILENO, CLEAR_SCREEN_ANSI, 7);
 }
 
 static void signal_handler(int signo)
@@ -313,6 +313,9 @@ static void process_input(int read)
 		row++;
 		col = 0;
 		move(row, col);
+		break;
+	case KEY_HOME:
+	case KEY_END:
 		break;
 	case CTRL('f'):
 		break;			
