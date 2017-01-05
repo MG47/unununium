@@ -16,7 +16,7 @@
 #include <ncurses.h>
 #include <fcntl.h>
 
-#define UTILITY_COUNT 2
+#define UTILITY_COUNT 3
 
 struct utility {
 	char *util_name;
@@ -37,5 +37,10 @@ int dtsinfo_main(int argc, char **argv);
 int tiper_main(int argc, char **argv);
 #define TIPER_VERSION 0
 #define TIPER_REVISION 1
+
+/* less */
+int less_main(int argc, char **argv);
+#define LESS_VERSION 0
+#define LESS_REVISION 1
 
 #endif
