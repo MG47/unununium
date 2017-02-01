@@ -31,6 +31,8 @@ struct file_buffer {
 };
 
 static struct file_buffer buffer;
+static char *file_string;	
+
 
 static void usage()
 {
@@ -102,10 +104,6 @@ static FILE *parse_file(char *filename)
 		i++;
 
 	buffer.buffer_lines = i + 1;
-	if (buffer.buffer_lines > 24) {
-		printf("error: less can only handle files with less than %d lines currently\n", 24);
-		exit(EXIT_FAILURE);
-	}
 
 	return stream;
 }
@@ -125,9 +123,13 @@ static void print_contents()
 {
 	clear();
 	unsigned int i;
-	for (i = 1; i < buffer.buffer_lines; i++) 
+
+	for (i = 0; i < buffer.buffer_lines - 1; i++) 
 		mvprintw(i, 0, "%s", buffer.buf[i]);
 	refresh();
+	attron(A_REVERSE);
+	mvprintw(i, 0, "%s (END)", file_string);
+	attroff(A_REVERSE);
 }
 
 static void process_input(int read)
@@ -154,10 +156,9 @@ static void process_input(int read)
 	}
 }
 
-int tiper_main(int argc, char **argv)
+int less_main(int argc, char **argv)
 {
 	int opt;
-	char *file_string;	
 	int read;
 
 	printf("\nless :\n");
@@ -197,7 +198,7 @@ int tiper_main(int argc, char **argv)
 	init_console();
 	move(0, 0);
 	print_contents();
-	move(0, 0);
+	move(buffer.buffer_lines - 1, 0);
 
 	while (1) {	
 		getyx(stdscr, row, col);

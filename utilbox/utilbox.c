@@ -23,9 +23,9 @@ struct utility util_list[UTILITY_COUNT] = {
 	},
 	{
 		.util_name = "less",
-		.version = TIPER_VERSION,
-		.revision = TIPER_REVISION,
-		.util_main = &tiper_main,
+		.version = LESS_VERSION,
+		.revision = LESS_REVISION,
+		.util_main = &less_main,
 	},
 };
 
