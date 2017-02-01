@@ -21,6 +21,12 @@ struct utility util_list[UTILITY_COUNT] = {
 		.revision = TIPER_REVISION,
 		.util_main = &tiper_main,
 	},
+	{
+		.util_name = "less",
+		.version = LESS_VERSION,
+		.revision = LESS_REVISION,
+		.util_main = &less_main,
+	},
 };
 
 int main(int argc, char **argv)
