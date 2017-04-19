@@ -11,6 +11,7 @@
 static FILE *stream;
 static unsigned int maxrow, maxcol;
 static unsigned int row, col;
+static unsigned int current_page;
 
 #define BUFFER_LINES 300
 #define BUFFER_COLUMNS 80
@@ -26,7 +27,7 @@ struct file_buffer {
 	char **buf;
 	unsigned int buffer_lines;
 };
-
+/* Lock buffer */
 static struct file_buffer buffer;
 
 static void usage()
@@ -84,7 +85,7 @@ static FILE *parse_file(char *filename)
 		new_file = 1;
 	}
 
-	/* TODO need to fix allocation */
+	/* TODO need to fix allocation for scrolling*/
 	i = 0;
 	buffer.buf = (char **)malloc(BUFFER_LINES * sizeof(char *));
 	for (i = 0; i < BUFFER_LINES; i++) {
@@ -101,12 +102,24 @@ static FILE *parse_file(char *filename)
 		i++;
 
 	buffer.buffer_lines = i + 1;
+#if 0
 	if (buffer.buffer_lines > 24) {
 		printf("error: tiper can only handle files with less than %d lines currently\n", 24);
 		exit(EXIT_FAILURE);
 	}
-
+#endif
 	return stream;
+}
+
+static void print_menu()
+{
+	attron(A_REVERSE);
+	mvprintw(maxrow+1, maxcol/4, "Tiper Text Editor (%d.%d)\n", TIPER_VERSION, TIPER_REVISION);
+	mvprintw(maxrow+2, maxcol/4, "Shortcuts");
+	mvprintw(maxrow+1, maxcol/2, "Save and Exit: Ctrl+x");
+	mvprintw(maxrow+2, maxcol/2, "Save: Ctrl+i");
+	mvprintw(maxrow+1, 3*maxcol/4, "Exit: Ctrl+c");
+	attroff(A_REVERSE);
 }
 
 static void init_console()
@@ -115,35 +128,33 @@ static void init_console()
 	cbreak();
 	noecho();
 	keypad(stdscr, TRUE);
-	getmaxyx(stdscr, maxrow, maxcol);
-	attron(A_REVERSE);
-	mvprintw(maxrow-2, maxcol/4, "Tiper Text Editor (%d.%d)\n", TIPER_VERSION, TIPER_REVISION);
-	mvprintw(maxrow-1, maxcol/4, "Shortcuts");
-	mvprintw(maxrow-2, maxcol/2, "Save and Exit: Ctrl+x");
-	mvprintw(maxrow-1, maxcol/2, "Save: Ctrl+i");
-	mvprintw(maxrow-2, 3*maxcol/4, "Exit: Ctrl+c");
-	attroff(A_REVERSE);
+	int max_length;
+	getmaxyx(stdscr, max_length, maxcol);
+	maxrow = max_length - 3;
+	print_menu();
 	refresh();
 }
 
-static void print_line(int line_no) 
-{
-	mvprintw(line_no, 0, "%s", buffer.buf[line_no]);
-	refresh();
-}
-
-static void print_contents() 
+static void print_contents(unsigned int page_no) 
 {
 	clear();
 	unsigned int i;
-	for (i = 0; i < buffer.buffer_lines; i++) 
-		mvprintw(i, 0, "%s", buffer.buf[i]);
+	unsigned int line_offset = (page_no * maxrow) % maxrow;
+	unsigned int page_offset = page_no * maxrow;
+
+	for (i = line_offset; i < (line_offset + maxrow); i++) {
+		//TODO bounds check 
+		if (!((i + page_offset) < buffer.buffer_lines))
+			break;
+		mvprintw(i, 0, "%s", buffer.buf[i + page_offset]);
+	}
 	refresh();
+	print_menu();
 }
 
 static void save_to_file()
 {
-	//todo add newline at end
+	//TODO add newline at end
 	unsigned int i;
 	fseek(stream, 0, SEEK_SET);
 	for (i = 0; i < buffer.buffer_lines; i++) {
@@ -158,8 +169,8 @@ static void save_and_exit()
 	refresh();
 	endwin();
 
+	//todo call save_to_file instead of code repetition
 	unsigned int i;
-
 	fseek(stream, 0, SEEK_SET);
 	for (i = 0; i < buffer.buffer_lines; i++) {
 		fputs(buffer.buf[i], stream);
@@ -184,6 +195,7 @@ static void insert_char_at(char *str, int index, char ch)
 
 static void insert_newline()
 {
+	//TODO add fix for scrolling
 	unsigned int lines_to_end = (buffer.buffer_lines - 1) - row;
 	unsigned int chars_to_end = (strlen(buffer.buf[row]) + 1) - col ;
 
@@ -216,6 +228,7 @@ static void remove_char(char *str, char remove)
 
 static void remove_line()
 {
+	//TODO add fix for scrolling
 	unsigned int lines_to_end = (buffer.buffer_lines - 1) - row;
 
 	remove_char(buffer.buf[row - 1], '\n');
@@ -241,7 +254,14 @@ static void process_input(int read)
 			if (row > 0) {
 				row--;
 				col = strlen(buffer.buf[row]) - 1;
-			} 
+			} else {
+				if (current_page) {
+					row = maxrow - 1;
+					col = strlen(buffer.buf[row]) - 1;
+					current_page--;
+					print_contents(current_page);
+				}
+			}
 		}
 		move(row, col);
 		break;
@@ -249,23 +269,49 @@ static void process_input(int read)
 		if (col < maxcol && col < (strlen(buffer.buf[row]) - 1)) {
 			col++;
 		} else {
-			if (row < (buffer.buffer_lines - 1)) {
+			if (row < maxrow - 1) {
 				row++;
 				col = 0;
+			} else {
+				//TODO Fix this
+				unsigned int page_offset = (current_page * maxrow);
+				if (page_offset + row < (buffer.buffer_lines - 1)) {
+					row = 0;
+					col = 0;
+					current_page++;
+					print_contents(current_page);
+				}
 			}
 		}
 		move(row, col);
 		break;
 	case KEY_UP:
-		if (row > 0)
+		if (row > 0) {
 			row--;
-		if (col > (strlen(buffer.buf[row]) - 1))
-			col = (strlen(buffer.buf[row]) - 1);
+			if (col > (strlen(buffer.buf[row]) - 1))
+				col = (strlen(buffer.buf[row]) - 1);
+		} else {
+			if (current_page) {
+				row = maxrow - 1;
+				if (col > (strlen(buffer.buf[row]) - 1))
+					col = (strlen(buffer.buf[row]) - 1);
+				current_page--;
+				print_contents(current_page);
+			}
+		}
 		move(row, col);
 		break;
 	case KEY_DOWN:
-		if (row < (buffer.buffer_lines - 1))
-			row++;
+	//TODO Fix this max down
+		if (row < (buffer.buffer_lines - 1)) {
+			if (row < maxrow - 1) {
+				row++;
+			} else {
+				row = 0;
+				current_page++;
+				print_contents(current_page);
+			} 
+		}
 		// TODO Android shell has a different behaviour for key_down.
 //		if (col > (strlen(buffer.buf[row]) - 1))
 //			col = (strlen(buffer.buf[row]) - 1);
@@ -277,21 +323,26 @@ static void process_input(int read)
 			remove_char(buffer.buf[row], buffer.buf[row][col -1]);
 			mvdelch(row, col - 1);
 			col--;
-			move(row, col);
 		} else {
+			remove_line();
 			if (row > 0) {
-				remove_line();
-				print_contents();
 				row--;
 				col = (strlen(buffer.buf[row]));
-				move(row, col);
+			} else {
+				if (current_page) {
+					current_page--;
+					print_contents(current_page);
+				}
 			}
+			print_contents(current_page);
 		}
+		move(row, col);
 		break;
 	case KEY_DC:
 		//delete key
 		// TODO fix newline check
 		if (col <= (strlen(buffer.buf[row]) - 2)) {
+			unsigned int page_offset = current_page * maxrow; 
 			remove_char(buffer.buf[row], buffer.buf[row][col]);
 			delch();
 		} else {
@@ -301,7 +352,7 @@ static void process_input(int read)
 				row++;
 				col = 0;
 				remove_line();
-				print_contents();
+				print_contents(current_page);
 				move(oldrow, oldcol);	
 			}
 		}
@@ -309,7 +360,7 @@ static void process_input(int read)
 	case KEY_ENTER:
 	case 10:
 		insert_newline();
-		print_contents();
+		print_contents(current_page);
 		row++;
 		col = 0;
 		move(row, col);
@@ -331,8 +382,9 @@ static void process_input(int read)
 		break;
 	default:
 		if (col < maxcol) {
-			insert_char_at(buffer.buf[row], col, read);
-			print_line(row);
+			unsigned int page_offset = current_page * maxrow; 
+			insert_char_at(buffer.buf[page_offset + row], col, read);
+			mvprintw(row, 0, "%s", buffer.buf[page_offset + row]);
 			col++;
 			move(row, col);
 		}
@@ -379,9 +431,10 @@ int tiper_main(int argc, char **argv)
 	}
 #endif
 
+	current_page = 0;
 	init_console();
-	move(0, 0);
-	print_contents();
+	move(row, col);
+	print_contents(current_page);
 	move(0, 0);
 
 	while (1) {	
