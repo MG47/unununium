@@ -8,6 +8,8 @@
 
 #define TOOL_NAME "tiper"
 
+#define DEBUG_ON
+
 static FILE *stream;
 static unsigned int maxrow, maxcol;
 static unsigned int row, col;
@@ -139,6 +141,7 @@ static void print_contents(unsigned int page_no)
 {
 	clear();
 	unsigned int i;
+	//TODO simplify this
 	unsigned int line_offset = (page_no * maxrow) % maxrow;
 	unsigned int page_offset = page_no * maxrow;
 
@@ -246,18 +249,22 @@ static void remove_line()
 
 static void process_input(int read)
 {
+	unsigned int page_offset = (current_page * maxrow);
+	unsigned int line_offset = page_offset + row;
+
 	switch (read) {
 	case KEY_LEFT:
 		if (col > 0) {
 			col--;
 		} else {
-			if (row > 0) {
+			if (row) {
 				row--;
-				col = strlen(buffer.buf[row]) - 1;
+				line_offset = page_offset + row;
+				col = strlen(buffer.buf[line_offset]) - 1;
 			} else {
 				if (current_page) {
 					row = maxrow - 1;
-					col = strlen(buffer.buf[row]) - 1;
+					col = strlen(buffer.buf[line_offset]) - 1;
 					current_page--;
 					print_contents(current_page);
 				}
@@ -266,35 +273,34 @@ static void process_input(int read)
 		move(row, col);
 		break;
 	case KEY_RIGHT:
-		if (col < maxcol && col < (strlen(buffer.buf[row]) - 1)) {
+		if (col < maxcol && col < (strlen(buffer.buf[line_offset]) - 1)) {
 			col++;
 		} else {
-			if (row < maxrow - 1) {
-				row++;
-				col = 0;
-			} else {
-				//TODO Fix this
-				unsigned int page_offset = (current_page * maxrow);
-				if (page_offset + row < (buffer.buffer_lines - 1)) {
+			if (line_offset < (buffer.buffer_lines - 2)) {
+				if (row < maxrow - 1) {
+					row++;
+				} else {
 					row = 0;
-					col = 0;
 					current_page++;
 					print_contents(current_page);
-				}
+				} 
+				col = 0;
 			}
 		}
 		move(row, col);
 		break;
 	case KEY_UP:
-		if (row > 0) {
+		if (row) {
 			row--;
-			if (col > (strlen(buffer.buf[row]) - 1))
-				col = (strlen(buffer.buf[row]) - 1);
+			line_offset = page_offset + row;
+			if (col > (strlen(buffer.buf[line_offset]) - 1))
+				col = (strlen(buffer.buf[line_offset]) - 1);
 		} else {
 			if (current_page) {
 				row = maxrow - 1;
-				if (col > (strlen(buffer.buf[row]) - 1))
-					col = (strlen(buffer.buf[row]) - 1);
+				line_offset = page_offset + row;
+				if (col > (strlen(buffer.buf[line_offset]) - 1))
+					col = (strlen(buffer.buf[line_offset]) - 1);
 				current_page--;
 				print_contents(current_page);
 			}
@@ -302,8 +308,7 @@ static void process_input(int read)
 		move(row, col);
 		break;
 	case KEY_DOWN:
-	//TODO Fix this max down
-		if (row < (buffer.buffer_lines - 1)) {
+		if (line_offset < (buffer.buffer_lines - 2)) {
 			if (row < maxrow - 1) {
 				row++;
 			} else {
@@ -319,8 +324,9 @@ static void process_input(int read)
 		move(row, col);
 		break;
 	case KEY_BACKSPACE:
+		//TODO add scroll support
 		if (col > 0) {
-			remove_char(buffer.buf[row], buffer.buf[row][col -1]);
+			remove_char(buffer.buf[line_offset], buffer.buf[line_offset][col -1]);
 			mvdelch(row, col - 1);
 			col--;
 		} else {
@@ -331,7 +337,6 @@ static void process_input(int read)
 			} else {
 				if (current_page) {
 					current_page--;
-					print_contents(current_page);
 				}
 			}
 			print_contents(current_page);
@@ -339,6 +344,7 @@ static void process_input(int read)
 		move(row, col);
 		break;
 	case KEY_DC:
+		// TODO Add scrolling support
 		//delete key
 		// TODO fix newline check
 		if (col <= (strlen(buffer.buf[row]) - 2)) {
@@ -438,6 +444,15 @@ int tiper_main(int argc, char **argv)
 	move(0, 0);
 
 	while (1) {	
+#ifdef DEBUG_ON		
+//TODO add this as standard feature, and move to a convinient location
+//TODO format printf
+		unsigned int page_offset = (current_page * maxrow);
+		unsigned int line_offset = page_offset + row;
+		mvprintw(maxrow + 1, 0, "Page %u: %u (%u), %u", current_page, line_offset, row, col);
+		mvprintw(maxrow + 2, 0, "MAX LINES: %u", buffer.buffer_lines - 1);
+		move(row, col);
+#endif
 		getyx(stdscr, row, col);
 		read = getch();
 		process_input(read);
