@@ -11,6 +11,8 @@
 #define DEBUG_ON
 
 static FILE *stream;
+
+//TODO Make a struct for these
 static unsigned int maxrow, maxcol;
 static unsigned int row, col;
 static unsigned int current_page;
@@ -158,6 +160,7 @@ static void print_contents(unsigned int page_no)
 static void save_to_file()
 {
 	//TODO add newline at end
+	//TODO mvprintw saved to file//
 	unsigned int i;
 	fseek(stream, 0, SEEK_SET);
 	for (i = 0; i < buffer.buffer_lines; i++) {
@@ -196,11 +199,11 @@ static void insert_char_at(char *str, int index, char ch)
 	src[index] = ch;
 }
 
-static void insert_newline()
+static void insert_newline(unsigned int line_offset)
 {
 	//TODO add fix for scrolling
-	unsigned int lines_to_end = (buffer.buffer_lines - 1) - row;
-	unsigned int chars_to_end = (strlen(buffer.buf[row]) + 1) - col ;
+	unsigned int lines_to_end = (buffer.buffer_lines - 1) - line_offset;
+	unsigned int chars_to_end = (strlen(buffer.buf[line_offset]) + 1) - col ;
 
 	// TODO fix this
 	if (!buffer.buf)
@@ -213,9 +216,9 @@ static void insert_newline()
 
 	buffer.buffer_lines++;
 
-	strncpy(&buffer.buf[row + 1][0], &buffer.buf[row][col], chars_to_end);
-	buffer.buf[row][col] = '\n';
-	buffer.buf[row][col + 1] = '\0';
+	strncpy(&buffer.buf[line_offset + 1][0], &buffer.buf[line_offset][col], chars_to_end);
+	buffer.buf[line_offset][col] = '\n';
+	buffer.buf[line_offset][col + 1] = '\0';
 }
 
 static void remove_char(char *str, char remove) 
@@ -229,18 +232,18 @@ static void remove_char(char *str, char remove)
 	*dst = '\0';
 }
 
-static void remove_line()
+static void remove_line(unsigned int line_offset)
 {
 	//TODO add fix for scrolling
-	unsigned int lines_to_end = (buffer.buffer_lines - 1) - row;
-
-	remove_char(buffer.buf[row - 1], '\n');
-	strcat(buffer.buf[row - 1], buffer.buf[row]);
-
 	unsigned int i;
+	unsigned int lines_to_end = (buffer.buffer_lines - 1) - line_offset;
+
+	remove_char(buffer.buf[line_offset - 1], '\n');
+	strcat(buffer.buf[line_offset - 1], buffer.buf[line_offset]);
+
 	// TODO confirm this
 	for (i = 0; i < lines_to_end; i++) {
-		strcpy(buffer.buf[row + i], buffer.buf[row + i + 1]);
+		strcpy(buffer.buf[line_offset + i], buffer.buf[line_offset + i + 1]);
 	}
 
 	free(buffer.buf[buffer.buffer_lines - 1]);
@@ -254,6 +257,7 @@ static void process_input(int read)
 
 	switch (read) {
 	case KEY_LEFT:
+	//fix column bug
 		if (col > 0) {
 			col--;
 		} else {
@@ -264,15 +268,17 @@ static void process_input(int read)
 			} else {
 				if (current_page) {
 					row = maxrow - 1;
+					line_offset = page_offset + row;
 					col = strlen(buffer.buf[line_offset]) - 1;
 					current_page--;
-					print_contents(current_page);
 				}
 			}
+			print_contents(current_page);
 		}
 		move(row, col);
 		break;
 	case KEY_RIGHT:
+	//fix column bug
 		if (col < maxcol && col < (strlen(buffer.buf[line_offset]) - 1)) {
 			col++;
 		} else {
@@ -326,19 +332,20 @@ static void process_input(int read)
 	case KEY_BACKSPACE:
 		//TODO add scroll support
 		if (col > 0) {
-			remove_char(buffer.buf[line_offset], buffer.buf[line_offset][col -1]);
+			remove_char(buffer.buf[line_offset], buffer.buf[line_offset][col - 1]);
 			mvdelch(row, col - 1);
 			col--;
 		} else {
-			remove_line();
+			remove_line(line_offset);
 			if (row > 0) {
 				row--;
-				col = (strlen(buffer.buf[row]));
 			} else {
 				if (current_page) {
 					current_page--;
 				}
+				row = maxrow - 1;
 			}
+			col = (strlen(buffer.buf[row]));
 			print_contents(current_page);
 		}
 		move(row, col);
@@ -347,25 +354,19 @@ static void process_input(int read)
 		// TODO Add scrolling support
 		//delete key
 		// TODO fix newline check
-		if (col <= (strlen(buffer.buf[row]) - 2)) {
-			unsigned int page_offset = current_page * maxrow; 
-			remove_char(buffer.buf[row], buffer.buf[row][col]);
+		if (col < (strlen(buffer.buf[line_offset]))) {
+			remove_char(buffer.buf[line_offset], buffer.buf[line_offset][col]);
 			delch();
 		} else {
-			if (row < (buffer.buffer_lines - 1)) {
-				unsigned int oldrow = row;
-				unsigned int oldcol = col;
-				row++;
-				col = 0;
-				remove_line();
-				print_contents(current_page);
-				move(oldrow, oldcol);	
+			if (line_offset < buffer.buffer_lines - 1) {
+				remove_line(line_offset + 1);
 			}
 		}
+		print_contents(current_page);
 		break;
 	case KEY_ENTER:
 	case 10:
-		insert_newline();
+		insert_newline(line_offset);
 		print_contents(current_page);
 		row++;
 		col = 0;
@@ -451,12 +452,13 @@ int tiper_main(int argc, char **argv)
 		unsigned int line_offset = page_offset + row;
 		mvprintw(maxrow + 1, 0, "Page %u: %u (%u), %u", current_page, line_offset, row, col);
 		mvprintw(maxrow + 2, 0, "MAX LINES: %u", buffer.buffer_lines - 1);
+		refresh();
 		move(row, col);
 #endif
-		getyx(stdscr, row, col);
 		read = getch();
 		process_input(read);
 		refresh();
+
 	}
 	return 0;
 }
