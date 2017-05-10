@@ -102,6 +102,7 @@ static FILE *parse_file(char *filename)
 	}
 
 	i = 0;
+	/* TODO : add critical maxcolumn check */
 	while (fgets(buffer.buf[i], BUFFER_COLUMNS, stream) != NULL)
 		i++;
 
@@ -232,9 +233,17 @@ static void remove_char(char *str, char remove)
 	*dst = '\0';
 }
 
-static void remove_line(unsigned int line_offset)
+static void remove_char_at(char *src, int index)
 {
-	//TODO add fix for scrolling
+	int i, len;
+	len = strlen(src);
+	for (i = index; i <= len; i++) {
+		src[i] = src[i + 1];
+	}
+}
+
+static void remove_newline(unsigned int line_offset)
+{
 	unsigned int i;
 	unsigned int lines_to_end = (buffer.buffer_lines - 1) - line_offset;
 
@@ -330,36 +339,34 @@ static void process_input(int read)
 		move(row, col);
 		break;
 	case KEY_BACKSPACE:
-		//TODO add scroll support
+		//TODO fix last line bug
 		if (col > 0) {
-			remove_char(buffer.buf[line_offset], buffer.buf[line_offset][col - 1]);
+			remove_char_at(buffer.buf[line_offset], (col - 1));
 			mvdelch(row, col - 1);
 			col--;
 		} else {
-			remove_line(line_offset);
-			if (row > 0) {
-				row--;
-			} else {
-				if (current_page) {
+			if (line_offset) {
+				col = (strlen(buffer.buf[line_offset - 1])) - 1;
+				remove_newline(line_offset);
+				if (row > 0) {
+					row--;
+				} else {
 					current_page--;
+					row = maxrow - 1;
 				}
-				row = maxrow - 1;
+				print_contents(current_page);
 			}
-			col = (strlen(buffer.buf[row]));
-			print_contents(current_page);
 		}
 		move(row, col);
 		break;
 	case KEY_DC:
-		// TODO Add scrolling support
-		//delete key
-		// TODO fix newline check
-		if (col < (strlen(buffer.buf[line_offset]))) {
-			remove_char(buffer.buf[line_offset], buffer.buf[line_offset][col]);
+		//TODO fix last line bug
+		if (col < (strlen(buffer.buf[line_offset]) - 1)) {
+			remove_char_at(buffer.buf[line_offset], col);
 			delch();
 		} else {
-			if (line_offset < buffer.buffer_lines - 1) {
-				remove_line(line_offset + 1);
+			if (line_offset < buffer.buffer_lines - 2) {
+				remove_newline(line_offset + 1);
 			}
 		}
 		print_contents(current_page);
@@ -367,8 +374,13 @@ static void process_input(int read)
 	case KEY_ENTER:
 	case 10:
 		insert_newline(line_offset);
+		if (row == (maxrow - 1)) {
+			current_page++;
+			row = 0;
+		} else {
+			row++;
+		}
 		print_contents(current_page);
-		row++;
 		col = 0;
 		move(row, col);
 		break;
@@ -406,6 +418,7 @@ int tiper_main(int argc, char **argv)
 
 	printf("\nTiper Text Editor :\n");
 	if (argc < 2) {
+		/* TODO : create a file named 'untitled' instead of usage */
 		usage();
 		return 0;
 	}
