@@ -64,7 +64,12 @@ static void signal_handler(int signo)
 		clear_screen();
 		exit(EXIT_FAILURE);
 	}
+
+	if (signo = SIGWINCH) {
+		//TODO Handle resize gracefully
+	}
 }
+
 #if 0
 static void resize_handler(int sig)
 {
@@ -116,14 +121,23 @@ static FILE *parse_file(char *filename)
 	return stream;
 }
 
+static void print_cursor_info()
+{
+	unsigned int page_offset = (current_page * maxrow);
+	unsigned int line_offset = page_offset + row;
+	mvprintw(maxrow + 1, 0, "Page %u: %u (%u), %u", current_page, line_offset, row, col);
+	mvprintw(maxrow + 2, 0, "MAX LINES: %u", buffer.buffer_lines - 1);
+	refresh();
+}
+
 static void print_menu()
 {
 	attron(A_REVERSE);
-	mvprintw(maxrow+1, maxcol/4, "Tiper Text Editor (%d.%d)\n", TIPER_VERSION, TIPER_REVISION);
-	mvprintw(maxrow+2, maxcol/4, "Shortcuts");
-	mvprintw(maxrow+1, maxcol/2, "Save and Exit: Ctrl+x");
-	mvprintw(maxrow+2, maxcol/2, "Save: Ctrl+i");
-	mvprintw(maxrow+1, 3*maxcol/4, "Exit: Ctrl+c");
+	mvprintw(maxrow + 1, maxcol / 4, "Tiper Text Editor (%d.%d)\n", TIPER_VERSION, TIPER_REVISION);
+	mvprintw(maxrow + 2, maxcol / 4, "Shortcuts");
+	mvprintw(maxrow + 1, maxcol / 2, "Save and Exit: Ctrl+x");
+	mvprintw(maxrow + 2, maxcol / 2, "Save: Ctrl+i");
+	mvprintw(maxrow + 1,  (maxcol * 3.0) / 4, "Exit: Ctrl+c");
 	attroff(A_REVERSE);
 }
 
@@ -144,9 +158,8 @@ static void print_contents(unsigned int page_no)
 {
 	clear();
 	unsigned int i;
-	//TODO simplify this
-	unsigned int line_offset = (page_no * maxrow) % maxrow;
 	unsigned int page_offset = page_no * maxrow;
+	unsigned int line_offset = page_offset % maxrow;
 
 	for (i = line_offset; i < (line_offset + maxrow); i++) {
 		//TODO bounds check 
@@ -172,18 +185,10 @@ static void save_to_file()
 
 static void save_and_exit()
 {
+	save_to_file();
 	erase();
 	refresh();
 	endwin();
-
-	//todo call save_to_file instead of code repetition
-	unsigned int i;
-	fseek(stream, 0, SEEK_SET);
-	for (i = 0; i < buffer.buffer_lines; i++) {
-		fputs(buffer.buf[i], stream);
-	}
-	fflush(stream);
-
 	clear_screen();
 	exit(EXIT_SUCCESS);
 }
@@ -388,7 +393,7 @@ static void process_input(int read)
 	case KEY_END:
 		break;
 	case CTRL('f'):
-		break;			
+		break;		
 	case CTRL('i'):
 		save_to_file();
 		break;			
@@ -444,12 +449,10 @@ int tiper_main(int argc, char **argv)
 		return 0;
 	}
 
-#if 0
-	if (signal(SIGWINCH, resize_handler) == SIG_ERR) {
+	if (signal(SIGWINCH, signal_handler) == SIG_ERR) {
 		printf("Error: Cannot handle signal SIGNINT");
 		return 0;
 	}
-#endif
 
 	current_page = 0;
 	init_console();
@@ -458,16 +461,10 @@ int tiper_main(int argc, char **argv)
 	move(0, 0);
 
 	while (1) {	
-#ifdef DEBUG_ON		
-//TODO add this as standard feature, and move to a convinient location
-//TODO format printf
-		unsigned int page_offset = (current_page * maxrow);
-		unsigned int line_offset = page_offset + row;
-		mvprintw(maxrow + 1, 0, "Page %u: %u (%u), %u", current_page, line_offset, row, col);
-		mvprintw(maxrow + 2, 0, "MAX LINES: %u", buffer.buffer_lines - 1);
-		refresh();
-		move(row, col);
+#ifdef DEBUG_ON	
+		print_cursor_info();
 #endif
+		move(row, col);
 		read = getch();
 		process_input(read);
 		refresh();
