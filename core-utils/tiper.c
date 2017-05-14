@@ -167,11 +167,11 @@ static void print_menu()
 
 static void init_console()
 {
+	int max_length;
 	initscr();
 	cbreak();
 	noecho();
 	keypad(stdscr, TRUE);
-	int max_length;
 	getmaxyx(stdscr, max_length, maxcol);
 	maxrow = max_length - 3;
 	print_menu();
