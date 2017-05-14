@@ -17,12 +17,10 @@ static unsigned int maxrow, maxcol;
 static unsigned int row, col;
 static unsigned int current_page;
 
+/* TODO Remove limits */
 #define BUFFER_LINES 300
 #define BUFFER_COLUMNS 80
 
-/* TODO Change this */
-
-/*TODO Test this*/
 #ifndef CTRL
 #define CTRL(x) ((x) & 0x1f)
 #endif
@@ -33,6 +31,8 @@ struct file_buffer {
 };
 /* Lock buffer */
 static struct file_buffer buffer;
+
+static int new_file_flag;
 
 static void usage()
 {
@@ -77,6 +77,31 @@ static void resize_handler(int sig)
 }
 #endif
 
+static FILE *create_new_file()
+{
+	int fd;
+	char *new_filename = "untitled";
+
+	fd = open(new_filename, O_RDWR | O_CREAT | O_TRUNC | O_EXCL, 0644);
+	if (fd == -1) {
+		if (errno == EEXIST)
+			printf("file named 'untitled' already exists\n");
+		return NULL;
+	}
+
+	stream = fdopen(fd, "r+");
+	if (!stream) {
+		printf("error: %s\n", strerror(errno));
+		return NULL;
+	}
+
+	buffer.buf = (char **)malloc(sizeof(char *));
+	buffer.buf[0] = malloc(sizeof(char) * BUFFER_COLUMNS);
+	buffer.buffer_lines = 1;
+	new_file_flag = 1;
+	return stream;
+}
+
 static FILE *parse_file(char *filename)
 {
 	unsigned int i;
@@ -88,7 +113,7 @@ static FILE *parse_file(char *filename)
 		fd = open(filename, O_RDWR | O_CREAT | O_TRUNC, 0644);
 		stream = fdopen(fd, "r+");
 		if (!stream) {
-			perror("Error");
+			printf("error: %s\n", strerror(errno));
 			return NULL;
 		}
 		new_file = 1;
@@ -107,17 +132,16 @@ static FILE *parse_file(char *filename)
 	}
 
 	i = 0;
-	/* TODO : add critical maxcolumn check */
-	while (fgets(buffer.buf[i], BUFFER_COLUMNS, stream) != NULL)
+	/* TODO : add critical maxrow & maxcolumn check */
+	/* TODO : add rows dyanmically with fgets */
+	while ((i < BUFFER_LINES) && (fgets(buffer.buf[i], BUFFER_COLUMNS, stream) != NULL))
 		i++;
+	/* TODO : fix limit*/
+	if (i >= BUFFER_LINES - 1)
+		exit(EXIT_FAILURE);
+
 
 	buffer.buffer_lines = i + 1;
-#if 0
-	if (buffer.buffer_lines > 24) {
-		printf("error: tiper can only handle files with less than %d lines currently\n", 24);
-		exit(EXIT_FAILURE);
-	}
-#endif
 	return stream;
 }
 
@@ -181,6 +205,10 @@ static void save_to_file()
 		fputs(buffer.buf[i], stream);
 	}
 	fflush(stream);
+
+	//TODO ask new file name
+//	if (new_file_flag)
+
 }
 
 static void save_and_exit()
@@ -212,6 +240,7 @@ static void insert_newline(unsigned int line_offset)
 	unsigned int chars_to_end = (strlen(buffer.buf[line_offset]) + 1) - col ;
 
 	// TODO fix this
+	// TODO check allocation errors (out-of-memory)
 	if (!buffer.buf)
 		buffer.buf[buffer.buffer_lines] = malloc(sizeof(char) * BUFFER_COLUMNS);
 
@@ -431,7 +460,7 @@ int tiper_main(int argc, char **argv)
 	int read;
 
 	printf("\nTiper Text Editor :\n");
-	if (argc < 2) {
+	if (argc > 2) {
 		/* TODO : create a file named 'untitled' instead of usage */
 		usage();
 		return 0;
@@ -448,8 +477,13 @@ int tiper_main(int argc, char **argv)
 		}
 	}
 
-	file_string = argv[1];
-	stream = parse_file(file_string);
+	if (argc < 2) {
+		stream = create_new_file();
+	} else {
+		file_string = argv[1];
+		stream = parse_file(file_string);
+	}
+
 	if (!stream)
 		return 0;
 
