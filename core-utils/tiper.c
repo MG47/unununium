@@ -337,10 +337,13 @@ static void process_input(int read)
 				print_contents(current_page);
 			} 
 		}
-		// TODO Android shell has a different behaviour for key_down.
-//		if (col > (strlen(buffer.buf[row]) - 1))
-//			col = (strlen(buffer.buf[row]) - 1);
+/*Android shell has a different behaviour for key_down.*/
+#ifdef ANDROID_SHELL
 		col = 0;
+#else
+		if (col > (strlen(buffer.buf[row]) - 1))
+			col = (strlen(buffer.buf[row]) - 1);
+#endif
 		move(row, col);
 		break;
 	case KEY_BACKSPACE:
@@ -350,6 +353,9 @@ static void process_input(int read)
 			mvdelch(row, col - 1);
 			col--;
 		} else {
+			/* TODO fix max column limit */
+			if ((strlen(buffer.buf[line_offset]) + (strlen(buffer.buf[line_offset - 1])))  >= maxcol)
+				break;
 			if (line_offset) {
 				col = (strlen(buffer.buf[line_offset - 1])) - 1;
 				remove_newline(line_offset);
@@ -371,6 +377,9 @@ static void process_input(int read)
 			delch();
 		} else {
 			if (line_offset < buffer.buffer_lines - 2) {
+				/* TODO fix max column limit */
+				if ((strlen(buffer.buf[line_offset]) + (strlen(buffer.buf[line_offset + 1])))  >= maxcol)
+					break;		
 				remove_newline(line_offset + 1);
 			}
 		}
