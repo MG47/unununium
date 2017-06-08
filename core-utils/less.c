@@ -16,6 +16,8 @@ static unsigned int row, col;
 #define BUFFER_LINES 300
 #define BUFFER_COLUMNS 80
 
+#define DEBUG_ON
+
 /* TODO Change this */
 
 /*TODO Test this*/
@@ -95,11 +97,13 @@ static FILE *parse_file(char *filename)
 	/* TODO need to fix allocation */
 	i = 0;
 	buffer.buf = (char **)malloc(BUFFER_LINES * sizeof(char *));
+
 	for (i = 0; i < BUFFER_LINES; i++) {
 		buffer.buf[i] = malloc(sizeof(char) * BUFFER_COLUMNS);
 	}
 
 	i = 0;
+	/* TODO Add maxcolumn check */
 	while (fgets(buffer.buf[i], BUFFER_COLUMNS, stream) != NULL)
 		i++;
 
@@ -110,11 +114,14 @@ static FILE *parse_file(char *filename)
 
 static void init_console()
 {
+	int max_length;
 	initscr();
 	cbreak();
 	noecho();
 	keypad(stdscr, TRUE);
-	getmaxyx(stdscr, maxrow, maxcol);
+	getmaxyx(stdscr, max_length, maxcol);
+	maxrow = max_length - 1;
+//	scrollok(stdscr,TRUE);
 	mvprintw(maxrow, 0, ":");
 	refresh();
 }
@@ -123,35 +130,41 @@ static void print_contents()
 {
 	clear();
 	unsigned int i;
+	unsigned int offset;
 
-	for (i = 0; i < buffer.buffer_lines - 1; i++) 
-		mvprintw(i, 0, "%s", buffer.buf[i]);
-	refresh();
+	offset = row - maxrow;
+	for (i = 0; ((i < maxrow) && ((offset + i) < buffer.buffer_lines)); i++) 
+		mvprintw(i, 0, "%s", buffer.buf[offset + i]);
+	if ((offset + i) < (buffer.buffer_lines - 1)) {
+		mvprintw(i, 0, ": ");
+	} else {
+		attron(A_REVERSE);
+		mvprintw(i, 0, "(END)");
+	}
 	attron(A_REVERSE);
-	mvprintw(i, 0, "%s (END)", file_string);
+#ifdef DEBUG_ON
+	mvprintw(i, maxcol/2, "row %d   maxrow %d  MAX LINES %d ", row, maxrow, buffer.buffer_lines);
+#endif
+	move(i + 1, 0);
 	attroff(A_REVERSE);
+	refresh();
 }
 
 static void process_input(int read)
 {
 	switch (read) {
-	case KEY_LEFT:
-		break;
-	case KEY_RIGHT:
-		break;
 	case KEY_UP:
-		break;
-	case KEY_DOWN:
-		break;
-	case KEY_ENTER:
-	case 10:
+		if (row > maxrow)
+			row--;
 		print_contents();
 		break;
-	case KEY_HOME:
-	case KEY_END:
+	case KEY_DOWN:
+		if (row < buffer.buffer_lines - 1)
+			row++;
+		print_contents();
 		break;
 	default:
-		if (read == 113)
+		if (read == 'q')
 			exit_less();
 	}
 }
@@ -188,6 +201,7 @@ int less_main(int argc, char **argv)
 		return 0;
 	}
 
+/* TODO : Add sigwinch handler */
 #if 0
 	if (signal(SIGWINCH, resize_handler) == SIG_ERR) {
 		printf("Error: Cannot handle signal SIGNINT");
@@ -196,12 +210,10 @@ int less_main(int argc, char **argv)
 #endif
 
 	init_console();
-	move(0, 0);
+	row = maxrow;
 	print_contents();
-	move(buffer.buffer_lines - 1, 0);
 
 	while (1) {	
-		getyx(stdscr, row, col);
 		read = getch();
 		process_input(read);
 		refresh();

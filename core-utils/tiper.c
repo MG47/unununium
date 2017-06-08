@@ -8,16 +8,19 @@
 
 #define TOOL_NAME "tiper"
 
+#define DEBUG_ON
+
 static FILE *stream;
+
+//TODO Make a struct for these
 static unsigned int maxrow, maxcol;
 static unsigned int row, col;
+static unsigned int current_page;
 
+/* TODO Remove limits */
 #define BUFFER_LINES 300
 #define BUFFER_COLUMNS 80
 
-/* TODO Change this */
-
-/*TODO Test this*/
 #ifndef CTRL
 #define CTRL(x) ((x) & 0x1f)
 #endif
@@ -26,8 +29,10 @@ struct file_buffer {
 	char **buf;
 	unsigned int buffer_lines;
 };
-
+/* Lock buffer */
 static struct file_buffer buffer;
+
+static int new_file_flag;
 
 static void usage()
 {
@@ -59,13 +64,43 @@ static void signal_handler(int signo)
 		clear_screen();
 		exit(EXIT_FAILURE);
 	}
+
+	if (signo = SIGWINCH) {
+		//TODO Handle resize gracefully
+	}
 }
+
 #if 0
 static void resize_handler(int sig)
 {
 	// handle SIGWINCH
 }
 #endif
+
+static FILE *create_new_file()
+{
+	int fd;
+	char *new_filename = "untitled";
+
+	fd = open(new_filename, O_RDWR | O_CREAT | O_TRUNC | O_EXCL, 0644);
+	if (fd == -1) {
+		if (errno == EEXIST)
+			printf("file named 'untitled' already exists\n");
+		return NULL;
+	}
+
+	stream = fdopen(fd, "r+");
+	if (!stream) {
+		printf("error: %s\n", strerror(errno));
+		return NULL;
+	}
+
+	buffer.buf = (char **)malloc(sizeof(char *));
+	buffer.buf[0] = malloc(sizeof(char) * BUFFER_COLUMNS);
+	buffer.buffer_lines = 1;
+	new_file_flag = 1;
+	return stream;
+}
 
 static FILE *parse_file(char *filename)
 {
@@ -78,13 +113,13 @@ static FILE *parse_file(char *filename)
 		fd = open(filename, O_RDWR | O_CREAT | O_TRUNC, 0644);
 		stream = fdopen(fd, "r+");
 		if (!stream) {
-			perror("Error");
+			printf("error: %s\n", strerror(errno));
 			return NULL;
 		}
 		new_file = 1;
 	}
 
-	/* TODO need to fix allocation */
+	/* TODO need to fix allocation for scrolling*/
 	i = 0;
 	buffer.buf = (char **)malloc(BUFFER_LINES * sizeof(char *));
 	for (i = 0; i < BUFFER_LINES; i++) {
@@ -97,75 +132,91 @@ static FILE *parse_file(char *filename)
 	}
 
 	i = 0;
-	while (fgets(buffer.buf[i], BUFFER_COLUMNS, stream) != NULL)
+	/* TODO : add critical maxrow & maxcolumn check */
+	/* TODO : add rows dyanmically with fgets */
+	while ((i < BUFFER_LINES) && (fgets(buffer.buf[i], BUFFER_COLUMNS, stream) != NULL))
 		i++;
+	/* TODO : fix limit*/
+	if (i >= BUFFER_LINES - 1)
+		exit(EXIT_FAILURE);
+
 
 	buffer.buffer_lines = i + 1;
-	if (buffer.buffer_lines > 24) {
-		printf("error: tiper can only handle files with less than %d lines currently\n", 24);
-		exit(EXIT_FAILURE);
-	}
-
 	return stream;
+}
+
+static void print_cursor_info()
+{
+	unsigned int page_offset = (current_page * maxrow);
+	unsigned int line_offset = page_offset + row;
+	mvprintw(maxrow + 1, 0, "Page %u: %u (%u), %u", current_page, line_offset, row, col);
+	mvprintw(maxrow + 2, 0, "MAX LINES: %u", buffer.buffer_lines - 1);
+	refresh();
+}
+
+static void print_menu()
+{
+	attron(A_REVERSE);
+	mvprintw(maxrow + 1, maxcol / 4, "Tiper Text Editor (%d.%d)\n", TIPER_VERSION, TIPER_REVISION);
+	mvprintw(maxrow + 2, maxcol / 4, "Shortcuts");
+	mvprintw(maxrow + 1, maxcol / 2, "Save and Exit: Ctrl+x");
+	mvprintw(maxrow + 2, maxcol / 2, "Save: Ctrl+i");
+	mvprintw(maxrow + 1,  (maxcol * 3.0) / 4, "Exit: Ctrl+c");
+	attroff(A_REVERSE);
 }
 
 static void init_console()
 {
+	int max_length;
 	initscr();
 	cbreak();
 	noecho();
 	keypad(stdscr, TRUE);
-	getmaxyx(stdscr, maxrow, maxcol);
-	attron(A_REVERSE);
-	mvprintw(maxrow-2, maxcol/4, "Tiper Text Editor (%d.%d)\n", TIPER_VERSION, TIPER_REVISION);
-	mvprintw(maxrow-1, maxcol/4, "Shortcuts");
-	mvprintw(maxrow-2, maxcol/2, "Save and Exit: Ctrl+x");
-	mvprintw(maxrow-1, maxcol/2, "Save: Ctrl+i");
-	mvprintw(maxrow-2, 3*maxcol/4, "Exit: Ctrl+c");
-	attroff(A_REVERSE);
+	getmaxyx(stdscr, max_length, maxcol);
+	maxrow = max_length - 3;
+	print_menu();
 	refresh();
 }
 
-static void print_line(int line_no) 
-{
-	mvprintw(line_no, 0, "%s", buffer.buf[line_no]);
-	refresh();
-}
-
-static void print_contents() 
+static void print_contents(unsigned int page_no) 
 {
 	clear();
 	unsigned int i;
-	for (i = 0; i < buffer.buffer_lines; i++) 
-		mvprintw(i, 0, "%s", buffer.buf[i]);
+	unsigned int page_offset = page_no * maxrow;
+	unsigned int line_offset = page_offset % maxrow;
+
+	for (i = line_offset; i < (line_offset + maxrow); i++) {
+		//TODO bounds check 
+		if (!((i + page_offset) < buffer.buffer_lines))
+			break;
+		mvprintw(i, 0, "%s", buffer.buf[i + page_offset]);
+	}
 	refresh();
+	print_menu();
 }
 
 static void save_to_file()
 {
-	//todo add newline at end
+	//TODO add newline at end
+	//TODO mvprintw saved to file//
 	unsigned int i;
 	fseek(stream, 0, SEEK_SET);
 	for (i = 0; i < buffer.buffer_lines; i++) {
 		fputs(buffer.buf[i], stream);
 	}
 	fflush(stream);
+
+	//TODO ask new file name
+//	if (new_file_flag)
+
 }
 
 static void save_and_exit()
 {
+	save_to_file();
 	erase();
 	refresh();
 	endwin();
-
-	unsigned int i;
-
-	fseek(stream, 0, SEEK_SET);
-	for (i = 0; i < buffer.buffer_lines; i++) {
-		fputs(buffer.buf[i], stream);
-	}
-	fflush(stream);
-
 	clear_screen();
 	exit(EXIT_SUCCESS);
 }
@@ -182,12 +233,14 @@ static void insert_char_at(char *str, int index, char ch)
 	src[index] = ch;
 }
 
-static void insert_newline()
+static void insert_newline(unsigned int line_offset)
 {
-	unsigned int lines_to_end = (buffer.buffer_lines - 1) - row;
-	unsigned int chars_to_end = (strlen(buffer.buf[row]) + 1) - col ;
+	//TODO add fix for scrolling
+	unsigned int lines_to_end = (buffer.buffer_lines - 1) - line_offset;
+	unsigned int chars_to_end = (strlen(buffer.buf[line_offset]) + 1) - col ;
 
 	// TODO fix this
+	// TODO check allocation errors (out-of-memory)
 	if (!buffer.buf)
 		buffer.buf[buffer.buffer_lines] = malloc(sizeof(char) * BUFFER_COLUMNS);
 
@@ -198,9 +251,9 @@ static void insert_newline()
 
 	buffer.buffer_lines++;
 
-	strncpy(&buffer.buf[row + 1][0], &buffer.buf[row][col], chars_to_end);
-	buffer.buf[row][col] = '\n';
-	buffer.buf[row][col + 1] = '\0';
+	strncpy(&buffer.buf[line_offset + 1][0], &buffer.buf[line_offset][col], chars_to_end);
+	buffer.buf[line_offset][col] = '\n';
+	buffer.buf[line_offset][col + 1] = '\0';
 }
 
 static void remove_char(char *str, char remove) 
@@ -214,17 +267,26 @@ static void remove_char(char *str, char remove)
 	*dst = '\0';
 }
 
-static void remove_line()
+static void remove_char_at(char *src, int index)
 {
-	unsigned int lines_to_end = (buffer.buffer_lines - 1) - row;
+	int i, len;
+	len = strlen(src);
+	for (i = index; i <= len; i++) {
+		src[i] = src[i + 1];
+	}
+}
 
-	remove_char(buffer.buf[row - 1], '\n');
-	strcat(buffer.buf[row - 1], buffer.buf[row]);
-
+static void remove_newline(unsigned int line_offset)
+{
 	unsigned int i;
+	unsigned int lines_to_end = (buffer.buffer_lines - 1) - line_offset;
+
+	remove_char(buffer.buf[line_offset - 1], '\n');
+	strcat(buffer.buf[line_offset - 1], buffer.buf[line_offset]);
+
 	// TODO confirm this
 	for (i = 0; i < lines_to_end; i++) {
-		strcpy(buffer.buf[row + i], buffer.buf[row + i + 1]);
+		strcpy(buffer.buf[line_offset + i], buffer.buf[line_offset + i + 1]);
 	}
 
 	free(buffer.buf[buffer.buffer_lines - 1]);
@@ -233,84 +295,135 @@ static void remove_line()
 
 static void process_input(int read)
 {
+	unsigned int page_offset = (current_page * maxrow);
+	unsigned int line_offset = page_offset + row;
+
 	switch (read) {
 	case KEY_LEFT:
+	//fix column bug
 		if (col > 0) {
 			col--;
 		} else {
-			if (row > 0) {
+			if (row) {
 				row--;
-				col = strlen(buffer.buf[row]) - 1;
-			} 
+				line_offset = page_offset + row;
+				col = strlen(buffer.buf[line_offset]) - 1;
+			} else {
+				if (current_page) {
+					row = maxrow - 1;
+					line_offset = page_offset + row;
+					col = strlen(buffer.buf[line_offset]) - 1;
+					current_page--;
+				}
+			}
+			print_contents(current_page);
 		}
 		move(row, col);
 		break;
 	case KEY_RIGHT:
-		if (col < maxcol && col < (strlen(buffer.buf[row]) - 1)) {
+	//fix column bug
+		if (col < maxcol && col < (strlen(buffer.buf[line_offset]) - 1)) {
 			col++;
 		} else {
-			if (row < (buffer.buffer_lines - 1)) {
-				row++;
+			if (line_offset < (buffer.buffer_lines - 2)) {
+				if (row < maxrow - 1) {
+					row++;
+				} else {
+					row = 0;
+					current_page++;
+					print_contents(current_page);
+				} 
 				col = 0;
 			}
 		}
 		move(row, col);
 		break;
 	case KEY_UP:
-		if (row > 0)
+		if (row) {
 			row--;
-		if (col > (strlen(buffer.buf[row]) - 1))
-			col = (strlen(buffer.buf[row]) - 1);
+			line_offset = page_offset + row;
+			if (col > (strlen(buffer.buf[line_offset]) - 1))
+				col = (strlen(buffer.buf[line_offset]) - 1);
+		} else {
+			if (current_page) {
+				row = maxrow - 1;
+				line_offset = page_offset + row;
+				if (col > (strlen(buffer.buf[line_offset]) - 1))
+					col = (strlen(buffer.buf[line_offset]) - 1);
+				current_page--;
+				print_contents(current_page);
+			}
+		}
 		move(row, col);
 		break;
 	case KEY_DOWN:
-		if (row < (buffer.buffer_lines - 1))
-			row++;
-		// TODO Android shell has a different behaviour for key_down.
-//		if (col > (strlen(buffer.buf[row]) - 1))
-//			col = (strlen(buffer.buf[row]) - 1);
+		if (line_offset < (buffer.buffer_lines - 2)) {
+			if (row < maxrow - 1) {
+				row++;
+			} else {
+				row = 0;
+				current_page++;
+				print_contents(current_page);
+			} 
+		}
+/*Android shell has a different behaviour for key_down.*/
+#ifdef ANDROID_SHELL
 		col = 0;
+#else
+		if (col > (strlen(buffer.buf[row]) - 1))
+			col = (strlen(buffer.buf[row]) - 1);
+#endif
 		move(row, col);
 		break;
 	case KEY_BACKSPACE:
+		//TODO fix last line bug
 		if (col > 0) {
-			remove_char(buffer.buf[row], buffer.buf[row][col -1]);
+			remove_char_at(buffer.buf[line_offset], (col - 1));
 			mvdelch(row, col - 1);
 			col--;
-			move(row, col);
 		} else {
-			if (row > 0) {
-				remove_line();
-				print_contents();
-				row--;
-				col = (strlen(buffer.buf[row]));
-				move(row, col);
+			/* TODO fix max column limit */
+			if ((strlen(buffer.buf[line_offset]) + (strlen(buffer.buf[line_offset - 1])))  >= maxcol)
+				break;
+			if (line_offset) {
+				col = (strlen(buffer.buf[line_offset - 1])) - 1;
+				remove_newline(line_offset);
+				if (row > 0) {
+					row--;
+				} else {
+					current_page--;
+					row = maxrow - 1;
+				}
+				print_contents(current_page);
 			}
 		}
+		move(row, col);
 		break;
 	case KEY_DC:
-		//delete key
-		// TODO fix newline check
-		if (col <= (strlen(buffer.buf[row]) - 2)) {
-			remove_char(buffer.buf[row], buffer.buf[row][col]);
+		//TODO fix last line bug
+		if (col < (strlen(buffer.buf[line_offset]) - 1)) {
+			remove_char_at(buffer.buf[line_offset], col);
 			delch();
 		} else {
-			if (row < (buffer.buffer_lines - 1)) {
-				unsigned int oldrow = row;
-				unsigned int oldcol = col;
-				row++;
-				col = 0;
-				remove_line();
-				print_contents();
-				move(oldrow, oldcol);	
+			if (line_offset < buffer.buffer_lines - 2) {
+				/* TODO fix max column limit */
+				if ((strlen(buffer.buf[line_offset]) + (strlen(buffer.buf[line_offset + 1])))  >= maxcol)
+					break;		
+				remove_newline(line_offset + 1);
 			}
 		}
+		print_contents(current_page);
 		break;
 	case KEY_ENTER:
 	case 10:
-		insert_newline();
-		print_contents();
-		row++;
+		insert_newline(line_offset);
+		if (row == (maxrow - 1)) {
+			current_page++;
+			row = 0;
+		} else {
+			row++;
+		}
+		print_contents(current_page);
 		col = 0;
 		move(row, col);
 		break;
@@ -318,7 +431,7 @@ static void process_input(int read)
 	case KEY_END:
 		break;
 	case CTRL('f'):
-		break;			
+		break;		
 	case CTRL('i'):
 		save_to_file();
 		break;			
@@ -331,8 +444,9 @@ static void process_input(int read)
 		break;
 	default:
 		if (col < maxcol) {
-			insert_char_at(buffer.buf[row], col, read);
-			print_line(row);
+			unsigned int page_offset = current_page * maxrow; 
+			insert_char_at(buffer.buf[page_offset + row], col, read);
+			mvprintw(row, 0, "%s", buffer.buf[page_offset + row]);
 			col++;
 			move(row, col);
 		}
@@ -346,7 +460,8 @@ int tiper_main(int argc, char **argv)
 	int read;
 
 	printf("\nTiper Text Editor :\n");
-	if (argc < 2) {
+	if (argc > 2) {
+		/* TODO : create a file named 'untitled' instead of usage */
 		usage();
 		return 0;
 	}
@@ -362,8 +477,13 @@ int tiper_main(int argc, char **argv)
 		}
 	}
 
-	file_string = argv[1];
-	stream = parse_file(file_string);
+	if (argc < 2) {
+		stream = create_new_file();
+	} else {
+		file_string = argv[1];
+		stream = parse_file(file_string);
+	}
+
 	if (!stream)
 		return 0;
 
@@ -372,23 +492,26 @@ int tiper_main(int argc, char **argv)
 		return 0;
 	}
 
-#if 0
-	if (signal(SIGWINCH, resize_handler) == SIG_ERR) {
+	if (signal(SIGWINCH, signal_handler) == SIG_ERR) {
 		printf("Error: Cannot handle signal SIGNINT");
 		return 0;
 	}
-#endif
 
+	current_page = 0;
 	init_console();
-	move(0, 0);
-	print_contents();
+	move(row, col);
+	print_contents(current_page);
 	move(0, 0);
 
 	while (1) {	
-		getyx(stdscr, row, col);
+#ifdef DEBUG_ON	
+		print_cursor_info();
+#endif
+		move(row, col);
 		read = getch();
 		process_input(read);
 		refresh();
+
 	}
 	return 0;
 }
