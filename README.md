@@ -8,9 +8,10 @@ Utilbox is a package containing common Unix/Linux command-line utilities for And
 **Current utilities (Utilbox v0.5)**
 
 - utilbox - the main multicall binary which executes other utilities.
-- tiper - terminal text editor
+- tiper - terminal text editor:
 - less - terminal pager program
 
+UPDATE Jun1-2019: 'tiper' is now a separate project: https://github.com/MG47/tiper
 
 **Under development**
 
